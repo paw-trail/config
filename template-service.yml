@@ -21,5 +21,5 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://${app.datasource.host}:5432/raw_db
+    url: jdbc:postgresql://${app.datasource.host}:5432/raw_db_refreshtest
     username: ingest_svc
