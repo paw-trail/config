@@ -1,0 +1,145 @@
+# =============================================================================
+# 1계층 — 모든 서비스 · 모든 환경
+# =============================================================================
+# 여기에는 서비스가 달라져도 환경이 달라져도 같은 값만 둠
+# 주소는 2계층(application-{env}.yml), 서비스 고유값은 3계층(<서비스명>.yml)임
+#
+# 아래 넷은 이 저장소에 없고 서비스 저장소의 application.yml 에 남음
+#   spring.application.name     config-server 에 자기를 알리는 이름임
+#   spring.config.import        이 저장소를 읽으러 가는 주소임
+#   spring.profiles.default     아무도 안 정해주면 local 로 봄
+# =============================================================================
+
+spring:
+
+  # ---------------------------------------------------------------------------
+  # DataSource
+  # ---------------------------------------------------------------------------
+  # url 과 username 은 서비스마다 다르므로 3계층에 있음
+  # 비밀번호만 여기 있는 이유는 서비스 계정 10개가 같은 값을 쓰기 때문임
+  #   계정을 나눈 목적은 누가 어느 DB 에 붙을 수 있는가를 권한으로 막는 것이지
+  #   비밀번호를 따로 두는 것이 아님
+  #
+  # 환경변수 이름이 infra 의 init 스크립트와 같아야 함
+  # 계정을 만들 때 쓰는 값과 접속할 때 쓰는 값이 같은 것이라는 뜻임
+  #
+  # 기본값을 붙이지 않음
+  # ${SERVICE_DB_PASSWORD:1234} 로 쓰면 환경변수를 빠뜨려도 접속이 되어 버려
+  # 누락이 영영 드러나지 않음
+  #
+  # DB 를 쓰지 않는 서비스(verdict, congestion, route, extract)에도 이 값이 내려가나
+  # 그 서비스들은 JDBC 의존성 자체를 걷어내므로 아무 일도 일어나지 않음
+  datasource:
+    password: ${SERVICE_DB_PASSWORD}
+
+  # ---------------------------------------------------------------------------
+  # JPA
+  # ---------------------------------------------------------------------------
+  jpa:
+    hibernate:
+      # 스키마는 Flyway 가 관리함
+      # 애플리케이션은 검증만 하며 엔티티와 실제 테이블이 어긋나면 기동에 실패함
+      # update 나 create 로 바꾸면 공용 DB 의 데이터가 사라질 수 있음
+      ddl-auto: validate
+    # 뷰 렌더링까지 영속성 컨텍스트를 열어 두지 않음
+    # 커넥션을 오래 쥐고 있어 풀이 마르는 원인이 되며 우리는 SPA 라 뷰 렌더링도 없음
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ---------------------------------------------------------------------------
+  # Flyway
+  # ---------------------------------------------------------------------------
+  flyway:
+    enabled: true
+    # 두 경로가 형제여야 함
+    # db/migration 은 db/migration/common 의 상위라서 Flyway 가 앞의 것을 버림
+    #   Discarding location ... as it is a sub-location of ...
+    # 그러면 공통 V1~V19 와 서비스 V20~ 의 대역 분리가 경로 수준에서 성립하지 않음
+    locations: classpath:db/migration/common,classpath:db/migration/service
+    # 이미 실행한 것보다 낮은 버전이 뒤늦게 나타나도 실행함
+    # 공통 모듈이 나중에 V3 를 추가하면 이미 V20 까지 실행한 서비스가
+    # Detected resolved migration not applied to database 로 기동에 실패하기 때문임
+    #
+    # 낮은 버전이 높은 버전의 산출물에 의존하면 깨지는 것이 이 옵션의 위험이나
+    # 공통 대역은 outbox 와 processed_event 둘뿐이고 서비스 테이블을 참조하지 않음
+    out-of-order: true
+
+  # ---------------------------------------------------------------------------
+  # Kafka
+  # ---------------------------------------------------------------------------
+  # bootstrap-servers 는 환경마다 다르므로 2계층에 있음
+  kafka:
+    consumer:
+      # 서비스 저장소의 spring.application.name 을 참조함
+      # 계층이 합쳐진 뒤 클라이언트가 해석하므로 여기서 그 값을 쓸 수 있음
+      group-id: ${spring.application.name}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    # 스프링 카프카는 Observation 이 기본 false 임
+    # 켜지 않으면 이벤트를 건너가는 순간 분산 추적이 끊기고 오류가 나지 않아
+    # 트레이스를 직접 열어보기 전까지 알 수 없음
+    # 프로듀서만 켜면 헤더는 실려 가지만 컨슈머가 무시하므로 둘 다 켬
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
+
+# -----------------------------------------------------------------------------
+# 서버
+# -----------------------------------------------------------------------------
+# port 는 서비스마다 다르므로 3계층에 있음
+server:
+  # 종료 신호를 받으면 처리 중인 요청을 마치고 내려감
+  # 무중단 배포에서 교체되는 인스턴스가 요청을 끊지 않게 하는 값임
+  shutdown: graceful
+
+# -----------------------------------------------------------------------------
+# 액추에이터 · 추적
+# -----------------------------------------------------------------------------
+# zipkin 전송 주소는 환경마다 다르므로 2계층에 있음
+management:
+  endpoints:
+    web:
+      exposure:
+        # refresh 가 있어야 config 저장소를 고친 뒤 재배포 없이 반영할 수 있음
+        include: health, info, prometheus, refresh
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      # 개발 중에는 전량 추적함
+      # 부하 테스트나 배포 시에는 2계층의 prod 에서 낮춤
+      probability: 1.0
+
+# -----------------------------------------------------------------------------
+# 애플리케이션 고유 설정
+# -----------------------------------------------------------------------------
+# loki 전송 주소는 환경마다 다르므로 2계층에 있음
+app:
+  auditor:
+    # 인증 없이 도는 코드가 감사 컬럼에 남길 이름임
+    # 배치 서비스만 3계층에서 ingest-batch, extract-batch 로 덮음
+    #
+    # 이 값이 없으면 created_by 가 NOT NULL 인데 비어서 배치 INSERT 가 통째로 실패함
+    system-name: SYSTEM
+  outbox:
+    relay:
+      # 미발행 이벤트를 회수하는 스케줄러임
+      # 기본은 꺼 두고 이벤트를 발행하는 서비스에서만, 그중 한 인스턴스에서만 켬
+      # 여러 인스턴스에서 켜면 같은 행을 동시에 집어 발행 순서 보장이 깨짐
+      enabled: false
+
+# -----------------------------------------------------------------------------
+# 로깅
+# -----------------------------------------------------------------------------
+logging:
+  level:
+    # 배포 환경에서는 2계층의 prod 에서 INFO 로 낮춤
+    com.pawtrail: DEBUG
