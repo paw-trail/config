@@ -1,0 +1,46 @@
+# =============================================================================
+# 2계층 — local
+# =============================================================================
+# IntelliJ 에서 직접 실행할 때 쓰는 주소임
+# 호스트에서 컨테이너를 바라보므로 전부 localhost 이고 포트는 compose 가 매핑한 값임
+# =============================================================================
+
+app:
+  datasource:
+    # 팀 공용 EC2 의 PostgreSQL 주소임
+    # 공인 IP 이고 5432 가 열려 있어 이 저장소에 값을 적지 않음
+    # 각자 .env 또는 IntelliJ 실행 구성에 DB_HOST 를 넣음
+    host: ${DB_HOST}
+  logging:
+    loki:
+      # local 에서는 logback 이 이 appender 를 붙이지 않으므로 실제로 쓰이지 않음
+      # 로컬에서 Loki 로 보내볼 일이 생기면 프로파일만 바꾸면 되도록 값은 채워 둠
+      url: http://localhost:3100/loki/api/v1/push
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    # 9092 가 아니라 29092 임
+    # 9092 도 호스트에 매핑돼 있어 첫 접속은 되지만, 브로커가 되돌려주는 주소가
+    # INTERNAL://kafka:9092 라서 호스트가 그 이름을 못 풀어 거기서 끊김
+    bootstrap-servers: localhost:29092
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    # IntelliJ 서비스가 localhost 로 등록하면 컨테이너 안의 게이트웨이가
+    # 그 주소를 자기 자신으로 해석해 스스로를 찌름
+    # Docker Desktop 이 hosts 에 넣어 두는 이름이라 호스트에서도 풀림
+    hostname: host.docker.internal
+    prefer-ip-address: false
+
+management:
+  tracing:
+    export:
+      zipkin:
+        endpoint: http://localhost:9411/api/v2/spans

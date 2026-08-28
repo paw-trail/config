@@ -1,0 +1,65 @@
+# =============================================================================
+# 2계층 — prod
+# =============================================================================
+# AWS EC2 에 배포할 때 쓰는 주소임
+#
+# * 노드 구성과 사설 IP 가 정해지지 않아 주소가 아직 비어 있음
+#   아래 TODO 를 채우기 전에는 prod 프로파일로 띄우지 말 것
+#   값이 없으면 1계층 값이 그대로 내려가 local 주소로 붙으려 시도하며
+#   오류 없이 이상하게 동작함
+#
+# * 주석을 풀 때 최상위 키(app, spring, eureka, management)가 두 번 나오지 않게 할 것
+#   YAML 중복 키가 되면 앞의 블록이 통째로 무시됨
+#   아래는 하나의 트리로 이어 두었으므로 블록째 주석만 풀면 됨
+# =============================================================================
+
+logging:
+  level:
+    # 배포 환경에서는 DEBUG 를 쓰지 않음
+    com.pawtrail: INFO
+
+# -----------------------------------------------------------------------------
+# TODO: AWS 노드 구성이 정해지면 아래 주석을 풀고 사설 IP 를 채울 것
+# -----------------------------------------------------------------------------
+# app:
+#   datasource:
+#     # TODO: data-primary 노드의 사설 IP
+#     #       DB 승격 시 Jenkins 가 고치는 자리가 이 한 줄임
+#     host: 10.0.0.0
+#   logging:
+#     loki:
+#       # TODO: 관측 노드의 사설 IP
+#       url: http://10.0.0.0:3100/loki/api/v1/push
+#
+# spring:
+#   data:
+#     redis:
+#       # TODO: Redis 가 뜨는 노드의 사설 IP
+#       host: 10.0.0.0
+#       port: 6379
+#   kafka:
+#     # TODO: Kafka 노드의 사설 IP
+#     bootstrap-servers: 10.0.0.0:9092
+#   datasource:
+#     hikari:
+#       # TODO: EC2 공용 DB 의 max_connections 를 확인한 뒤 필요하면 넣을 것
+#       #       기본값(10)으로 충분하면 이 줄을 두지 않음
+#       maximum-pool-size: 10
+#
+# eureka:
+#   client:
+#     service-url:
+#       # TODO: edge 노드의 사설 IP
+#       defaultZone: http://10.0.0.0:8761/eureka/
+#   instance:
+#     prefer-ip-address: true
+#
+# management:
+#   tracing:
+#     export:
+#       zipkin:
+#         # TODO: 관측 노드의 사설 IP
+#         endpoint: http://10.0.0.0:9411/api/v2/spans
+#     sampling:
+#       # TODO: 부하 테스트 결과를 보고 값을 정할 것 (1계층은 1.0 임)
+#       probability: 1.0
