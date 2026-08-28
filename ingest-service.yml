@@ -1,0 +1,23 @@
+# =============================================================================
+# 3계층 — ingest-service
+# =============================================================================
+# 수집 담당임 (공공 API 3종 → 원본 저장 → place 로 전달)
+# raw_db 는 Outbox 가 필요 없음, place.ingested 를 없앴고 place 로는 동기 API 로 넘김
+#
+# 호스트는 2계층의 app.datasource.host 에서 오고 비밀번호는 1계층에 있음
+# 계정 10개가 같은 비밀번호를 쓰므로 여기에는 계정명만 둠
+# =============================================================================
+
+server:
+  port: 8088
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${app.datasource.host}:5432/raw_db
+    username: ingest_svc
+
+app:
+  auditor:
+    # 인증 없이 도는 배치라 감사 컬럼에 남길 이름이 필요함
+    # 이 값이 없으면 created_by 가 비어 배치의 INSERT 가 통째로 실패함
+    system-name: ingest-batch
