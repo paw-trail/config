@@ -44,3 +44,10 @@ management:
     export:
       zipkin:
         endpoint: http://localhost:9411/api/v2/spans
+
+# 임시 — 4계층이 최상위인지 확인용임, 확인이 끝나면 이 파일을 지울 것
+#   application-local.yml(2계층) 에 9999
+#   template-service.yml(3계층) 에 8095
+#   7777 로 뜨면 4계층이 둘 다 이김
+server:
+  port: 7777
