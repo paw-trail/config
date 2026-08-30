@@ -2,6 +2,16 @@
 
 함께하개(paw-trail)의 모든 서비스가 사용하는 설정 저장소입니다. 자바 코드는 한 줄도 없고 YAML 파일만 들어 있습니다.
 
+**주소와 포트만 모아 둔 곳이 아닙니다.** 아래처럼 동작을 결정하는 값도 이곳에 있으므로, 해당 기능을 고칠 때 서비스 저장소가 아니라 여기를 찾습니다.
+
+| 무엇 | 어느 파일 |
+|---|---|
+| **게이트웨이 라우팅 규칙** (어느 경로가 어느 서비스로 가는가) | `gateway-server.yml` |
+| **인증 없이 열어 둘 경로 목록** | `gateway-server.yml` |
+| **토큰 서명을 확인하는 공개키** | `gateway-server.yml` |
+| 서비스 레지스트리의 자기 주소 인식 | `eureka-server-{env}.yml` |
+| 데이터베이스 주소 · 계정 · 포트 | 계층별로 나뉨 (2장) |
+
 이 저장소를 읽어 각 서비스에 설정을 내려주는 애플리케이션은 `config-server` 이며 별도 저장소입니다. 이름이 비슷하므로 혼동하지 않도록 주의합니다.
 
 ```
@@ -91,6 +101,28 @@ spring:
 
 **다만 쓸 때는 정확히 4계층에 써야 합니다.** 3계층이 2계층을 이기므로, 환경별 공통값을 특정 서비스만 다르게 하고 싶을 때 2계층에 적으면 덮여서 반영되지 않습니다. 이 경우가 4계층을 쓰는 유일한 자리입니다.
 
+#### 실제 사례 — `eureka-server-{env}.yml`
+
+지금 4계층 파일을 가진 것은 서비스 레지스트리 하나뿐이며, 위 조건에 정확히 들어맞습니다.
+
+서비스 레지스트리는 설정에 적힌 주소 목록을 **다른 레지스트리 서버의 목록**으로 읽고, 그중 자기 자신은 빼야 합니다. 그런데 자기인지 판단할 때 주소를 글자 그대로 비교하는데, 3계층이 주는 두 값이 서로 다릅니다.
+
+```
+eureka.instance.hostname                 host.docker.internal
+eureka.client.service-url.defaultZone    http://localhost:8761/eureka/
+```
+
+그래서 자기를 남으로 보고, 자기에게 복제하려다 **기동에 실패합니다.** `eureka.server.my-url` 을 주소 목록과 정확히 같게 지정하면 자기로 인식합니다.
+
+이 값은 환경마다 다르므로 2계층에 한 번만 둘 수 없고, 3계층이 2계층을 이기므로 2계층에 적으면 덮입니다. **4계층이 유일한 자리입니다.**
+
+| 파일 | 값 |
+|---|---|
+| `eureka-server-local.yml` | `http://localhost:8761/eureka/` |
+| `eureka-server-dev.yml` | `http://eureka-server:8761/eureka/` |
+
+**3계층의 `defaultZone` 을 고칠 때는 이 값도 함께 고칩니다.** 두 값은 슬래시 하나까지 같아야 합니다.
+
 ---
 
 ## 3. 환경 프로파일
@@ -134,9 +166,21 @@ spring:
 | 계층 | 파일 | 들어가는 값 |
 |:---:|---|---|
 | 1 | `application.yml` | `ddl-auto`, Flyway `locations`, 로깅 패턴, 액추에이터 노출 범위, Kafka 직렬화기와 Observation, 데이터베이스 비밀번호 참조 |
-| 2 | `{서비스명}.yml` | 포트, 데이터베이스 이름과 계정, `app.auditor.system-name`, `app.outbox.relay.enabled` |
+| 2 | `{서비스명}.yml` | 포트, 데이터베이스 이름과 계정, `app.auditor.system-name`, `app.outbox.relay.enabled`, **그 서비스만의 동작 설정** |
 | 3 | `application-{env}.yml` | 데이터베이스 호스트, Kafka 부트스트랩 주소, Redis 주소, 유레카 주소, Loki · Zipkin 주소 |
-| 4 | `{서비스명}-{env}.yml` | 되도록 비워 둡니다 |
+| 4 | `{서비스명}-{env}.yml` | 되도록 비워 둡니다 (2-3 참고) |
+
+2계층의 **그 서비스만의 동작 설정**이 실제로 무엇인지는 서비스마다 다릅니다. 지금 들어 있는 것은 아래와 같습니다.
+
+| 파일 | 그 서비스만의 값 |
+|---|---|
+| `gateway-server.yml` | **라우팅 규칙 19개**, **인증 없이 열어 둘 경로 7개**, **RS256 공개키**, 토큰에서 값을 꺼낼 이름, 액추에이터 `gateway` 노출 |
+| `eureka-server.yml` | 자기 등록 여부, 레지스트리 수신 여부, 자기보호 모드 |
+| `ingest-service.yml` · `extract-service.yml` | (구현 시) 배치 관련 설정 |
+
+**라우팅 규칙을 서비스 저장소가 아니라 여기에 두는 이유**는 도메인 서비스가 하나씩 완성될 때마다 라우트를 열어야 하기 때문입니다. 게이트웨이 저장소에 있으면 그때마다 이미지를 다시 만들고 무중단 배포를 한 번씩 돌게 됩니다. 여기 있으면 커밋하고 `/actuator/refresh` 를 부르면 끝납니다.
+
+대신 **이 파일의 오타 하나가 특정 경로 전체를 404로 만듭니다.** 고친 뒤에는 8장의 대조 확인을 습관으로 둡니다.
 
 ---
 
@@ -154,15 +198,43 @@ spring:
 | S3 자격증명 | |
 | `local` 프로파일의 데이터베이스 호스트 | 공인 IP이며 5432가 열려 있습니다 |
 
-**RS256 공개키는 이 저장소에 둡니다.** 서명 검증에만 쓰이므로 공개되어도 무해하며, 게이트웨이가 이 저장소를 통해 공개키를 받습니다.
+**RS256 공개키는 이 저장소에 둡니다.** 서명 검증에만 쓰이므로 공개되어도 무해하며, 실제로 `gateway-server.yml` 의 `app.jwt.public-key` 에 들어 있습니다. 개인키는 인증 서비스만 가지며 환경변수로 주입합니다.
 
-작성 형태는 다음과 같습니다.
+같은 키 쌍이라도 다루는 방식이 갈립니다.
+
+| | 어디에 | 왜 |
+|---|---|---|
+| 개인키 | 환경변수 | 유출되면 누구나 유효한 토큰을 만들 수 있습니다 |
+| 공개키 | **이 저장소** | 확인만 되고 만들 수는 없어 공개되어도 무해합니다 |
+
+비밀 값은 자리만 남기고 실제 값을 넣지 않습니다.
 
 ```yaml
 spring:
   datasource:
-    password: ${DB_PASSWORD}
+    password: ${SERVICE_DB_PASSWORD}
 ```
+
+반대로 공개키는 값을 그대로 적습니다. `openssl` 이 출력한 것을 **가공하지 않고 여러 줄 그대로** 넣습니다.
+
+```yaml
+app:
+  jwt:
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+      -----END PUBLIC KEY-----
+```
+
+**여러 줄 표기이므로 들여쓰기가 어긋나면 값이 잘립니다.** 그러면 게이트웨이가 기동할 때 키를 읽지 못해 실패합니다. 조용히 지나가지는 않지만, 고친 뒤에는 설정 서버가 실제로 내려주는 값에 줄바꿈이 살아 있는지 확인합니다.
+
+```powershell
+curl.exe http://localhost:8888/gateway-server/local
+```
+
+머리와 꼬리 줄을 떼거나 한 줄로 잇지 않습니다. 손대다 한 글자만 틀려도 **"서명 검증 실패"로만 나타나** 원인을 찾기 어렵습니다.
+
+**배포할 때는 키 쌍을 새로 만들고 이 값도 함께 바꿉니다.** 지금 것은 로컬 개발용이며 개인키가 각자 환경에 흩어져 있습니다. 두 값이 짝이 아니면 모든 요청이 401이 됩니다.
 
 **이 저장소의 파일에는 기본값을 함께 적지 않습니다.** `${DB_PASSWORD:1234}` 처럼 쓰면 환경변수를 빠뜨려도 접속이 되어 버려 누락이 영영 드러나지 않습니다. 환경변수가 없으면 기동이 실패하는 편이 낫습니다.
 
@@ -191,10 +263,12 @@ application-prod.yml
 
 ### 6-2. 플랫폼
 
-```
-eureka-server.yml
-gateway-server.yml
-```
+| 파일 | 계층 | 들어 있는 값 |
+|---|:---:|---|
+| `gateway-server.yml` | 2 | 포트 8080, **라우팅 규칙**, **인증 없이 열어 둘 경로**, **RS256 공개키**, 액추에이터 `gateway` 노출 |
+| `eureka-server.yml` | 2 | 포트 8761, 자기 등록 여부, 레지스트리 수신 여부, 자기보호 모드 |
+| `eureka-server-local.yml` | 4 | 자기 주소 인식 (2-3 참고) |
+| `eureka-server-dev.yml` | 4 | 위와 같음 |
 
 `config-server` 는 자기 설정을 이 저장소에서 받지 못합니다. 저장소 주소를 알아야 저장소를 읽을 수 있기 때문입니다. `config-server` 의 설정은 그 저장소의 `application.yml` 과 환경변수에 둡니다.
 
@@ -261,6 +335,21 @@ http://localhost:8888/auth-service/dev
 
 서비스가 설정을 받아 가는 경로도 원래 이 주소이므로 실사용에는 영향이 없습니다. 다만 **프로파일 이름에는 하이픈을 쓰면 안 됩니다.** 프로파일에 하이픈이 있으면 슬래시 주소마저 동작하지 않습니다.
 
+### 라우팅 규칙을 고쳤는데 특정 경로가 404 입니다
+
+**내가 적은 것과 게이트웨이가 실제로 물고 있는 것을 대조합니다.** 규칙이 이 저장소에 있으므로 두 곳을 각각 확인해야 합니다.
+
+```powershell
+curl.exe http://localhost:8888/gateway-server/local        내가 적은 것
+curl.exe http://localhost:8080/actuator/gateway/routes     실제로 도는 것
+```
+
+앞쪽에 있는데 뒤쪽에 없다면 게이트웨이가 설정을 다시 읽지 않은 것입니다. `POST /actuator/refresh` 를 호출하거나 재기동합니다.
+
+양쪽에 다 있는데도 404라면 경로 패턴을 봅니다. `/api/v1/places/` 아래는 여러 서비스가 나누어 쓰므로 `/**` 대신 `{placeId}` 처럼 마디를 정확히 지정해 두었습니다. 그래서 **하위 경로가 새로 생기면 규칙도 함께 추가해야 합니다.**
+
+뒤쪽 목록이 통째로 비어 있다면 게이트웨이가 설정을 받지 못한 것입니다. 이 서비스는 원래 포트가 8080이라 설정을 못 받아도 같은 포트에 뜨므로 **포트로는 판별되지 않습니다.**
+
 ### `{서비스명}.yml` 을 만들었는데 읽히지 않습니다
 
 파일명이 그 서비스의 `spring.application.name` 과 정확히 같은지 확인합니다. 다르면 오류 없이 무시되고 그 계층만 빠진 채 내려갑니다.
@@ -288,15 +377,21 @@ http://localhost:8888/auth-service/dev
 
 ```
 config/
-├── application.yml               모든 서비스 공통
-├── application-local.yml         IntelliJ 실행
-├── application-dev.yml           로컬 컨테이너
-├── application-prod.yml          AWS
-├── eureka-server.yml
-├── gateway-server.yml
-├── auth-service.yml              도메인 서비스 14개
+├── application.yml               1계층. 모든 서비스 공통
+│
+├── eureka-server.yml             2계층. 플랫폼
+├── gateway-server.yml            2계층. 라우팅 규칙 · 인증 예외 · 공개키
+├── auth-service.yml              2계층. 도메인 서비스 14개
 ├── ...
-├── template-service.yml          service-template 실행용
+├── template-service.yml          2계층. service-template 실행용
+│
+├── application-local.yml         3계층. IntelliJ 실행
+├── application-dev.yml           3계층. 로컬 컨테이너
+├── application-prod.yml          3계층. AWS
+│
+├── eureka-server-local.yml       4계층. 자기 주소 인식 (2-3 참고)
+├── eureka-server-dev.yml         4계층
+│
 ├── .gitattributes
 ├── .editorconfig
 ├── .gitignore
