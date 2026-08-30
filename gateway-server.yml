@@ -1,0 +1,255 @@
+# =============================================================================
+# 2계층 — gateway-server
+# =============================================================================
+# API 게이트웨이임
+#
+# 이 파일에 라우팅 규칙이 있는 이유
+#   도메인 서비스가 하나씩 완성될 때마다 라우트를 열어야 하는데
+#   게이트웨이 저장소에 있으면 그때마다 이미지 재빌드와 무중단 배포를 한 번씩 돌게 됨
+#   여기 있으면 push 와 /actuator/refresh 로 끝남
+#
+# 다만 대가가 있음 — 이 파일의 오타 하나가 특정 경로 전체를 404 로 만듦
+# 고친 뒤에는 아래 둘을 대조할 것
+#   curl.exe http://localhost:8888/gateway-server/local        내가 쓴 것
+#   curl.exe http://localhost:8080/actuator/gateway/routes     실제로 도는 것
+#
+# 다른 서비스와 달리 datasource 가 없음
+# 1계층의 JPA · Flyway · Kafka 값이 그대로 내려오지만
+# 그 의존성 자체를 넣지 않은 서비스라 값을 읽는 코드가 없어 아무 일도 일어나지 않음
+# =============================================================================
+
+server:
+  port: 8080
+
+# -----------------------------------------------------------------------------
+# 액추에이터
+# -----------------------------------------------------------------------------
+# 1계층은 health · info · prometheus · refresh 네 개만 여는데
+# 여기에는 gateway 를 더함
+#
+# /actuator/gateway/routes 가 지금 무엇이 열려 있는지 보여 주는 유일한 창구임
+# 설정을 받지 못했을 때도 이것으로 가려냄 — 이 서비스는 원래 포트가 8080 이라
+# 설정이 없어도 같은 포트에 그대로 뜨므로 포트로는 판별되지 않음
+#
+# * 내부 구조가 통째로 드러나는 자리임
+#   배포에서는 nginx 가 /api 만 넘겨 주므로 밖에서 닿지 않으나
+#   로컬은 8080 에 직접 붙을 수 있음
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, refresh, gateway
+
+# -----------------------------------------------------------------------------
+# 애플리케이션 고유 설정
+# -----------------------------------------------------------------------------
+app:
+  jwt:
+    # 토큰 서명을 확인하는 데 쓰는 공개키임
+    # 서명을 만들 수는 없고 확인만 되므로 공개 저장소에 있어도 무해함
+    # 서명을 만드는 개인키는 auth-service 만 가지며 환경변수로 주입함
+    #
+    # * openssl 이 뱉은 그대로 넣음
+    #   머리와 꼬리 줄을 떼거나 한 줄로 잇지 않음
+    #   가공하다 한 글자만 틀려도 "서명 검증 실패" 로만 나타나 원인을 찾기 어려움
+    #
+    # * 들여쓰기를 맞출 것
+    #   블록 표기라 아래 줄들이 같은 깊이여야 함
+    #   어긋나면 값이 잘려 기동할 때 키 파싱에 실패함
+    #
+    # * 배포 때는 키를 새로 만들고 이 값도 함께 바꿀 것
+    #   지금 것은 로컬 개발용이며 개인키가 각자 환경에 흩어져 있음
+    #   두 값이 짝이 아니면 전 요청이 401 이 됨
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm/Q19Fe36WoGyLuQpl+i
+      leM6J7HrN4xnHrg8Ip7G13uMlYAUbZTZW4myNIalTnzacMHUkAmyW2SutH3ONp9s
+      65ECsIOrnlxsHaJXqyQn9fzNb9emazJ5DCmE519OFGvR6auk709HCNhY1gdbeiTq
+      xEg0Oyk5lH7sluWrNkYvTMFNRcwspRD7OX0sRfz3CdKKvh/DSUxUYNOp2Yr/87v1
+      +D3+MFkgnPHIGxSbGTr5aAFVCWfKzrL6hQXpvLbpj7Yj9/yC2SSHxkNLzSGZs/EY
+      nO9giPhXk5AXOuQOlkk8JBINAGvo8O1CaHxkVF3f7I4Si7yCnUltGtcQIjgpYBVI
+      oQIDAQAB
+      -----END PUBLIC KEY-----
+
+  gateway:
+    # 인증 없이 통과시킬 경로임
+    # 여기 없는 경로는 전부 토큰을 확인함
+    #
+    # * 반대 방식(전부 열고 몇 개만 막기)을 쓰지 않음
+    #   새 경로를 목록에 넣지 않았을 때
+    #   지금 방식은 401 이 나서 바로 드러나고
+    #   반대 방식은 인증 없이 열려 버려 조용히 지나감
+    #
+    # * /api/v1/auth 아래를 통째로 열면 안 됨
+    #   같은 접두사 안에 계정 삭제와 비밀번호 변경이 함께 있음
+    #
+    # * oauth 아래를 한 줄로 둔 것은 제공자가 늘어날 수 있기 때문임
+    #   경로에 제공자 이름이 박혀 있으면 하나 늘 때마다 여기도 고쳐야 하고
+    #   빠뜨리면 그 제공자로 로그인할 때만 401 이 남
+    permit-all:
+      - /api/v1/auth/signup
+      - /api/v1/auth/login
+      - /api/v1/auth/refresh
+      - /api/v1/auth/logout
+      - /api/v1/auth/oauth/**
+      - /api/v1/auth/password/reset-request
+      - /api/v1/auth/password/reset
+
+spring:
+  cloud:
+    gateway:
+      # 접두사가 spring.cloud.gateway.server.webflux.* 임
+      # 예전 접두사(spring.cloud.gateway.*)를 쓰면 오류 없이 무시되므로
+      # 설정이 안 먹을 때 이것부터 확인할 것
+      server:
+        webflux:
+
+          # 유레카에 등록된 서비스를 자동으로 라우팅하는 기능은 켜지 않음
+          # 켜면 막기로 한 것들이 함께 열림
+          #   /internal/**    서비스끼리와 Jenkins 만 부르는 경로
+          #   config-server   전 서비스의 설정 원본
+          #   ingest·extract  브라우저가 부를 API 가 없음
+          # 적지 않으면 404 이므로 차단 규칙을 따로 쓰지 않아도 됨
+          discovery:
+            locator:
+              enabled: false
+
+          # ── 라우트 ───────────────────────────────────────────
+          # uri 의 lb:// 는 유레카에서 실제 주소를 받아 오라는 뜻임
+          # 뒤에 오는 이름은 그 서비스의 spring.application.name 과 같아야 함
+          #
+          # * 경로에 /** 를 쓸 때와 {변수} 를 쓸 때가 다름
+          #   /**      뒤에 오는 마디를 모두 먹음
+          #   {변수}    한 마디만 먹음
+          #   같은 접두사 아래에 여러 서비스가 있으면 {변수} 를 써야
+          #   서로 겹치지 않아 순서를 신경 쓰지 않아도 됨
+          routes:
+
+            # ── 인증 ─────────────────────────────────────────
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/v1/auth/**
+
+            # ── 사용자 ───────────────────────────────────────
+            # 한 서비스가 접두사 네 개를 가짐
+            # 프로필 · 즐겨찾기 · 방문 기록 · 일정이 모두 "사용자가 가진 목록" 이라
+            # 한 서비스에 두었기 때문임
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/users/**,/api/v1/favorites/**,/api/v1/visits/**,/api/v1/itineraries/**
+
+            # ── 반려동물 ─────────────────────────────────────
+            # breeds 는 견종 목록임
+            # 등록 화면의 선택지로 쓰이며 pet 이 가진 마스터 데이터라 함께 둠
+            - id: pet-service
+              uri: lb://pet-service
+              predicates:
+                - Path=/api/v1/pets/**,/api/v1/breeds
+
+            # ── 장소 상세 ────────────────────────────────────
+            # 아래 여섯은 같은 /api/v1/places/ 아래인데 가는 곳이 다름
+            # 장소 상세 화면에서 브라우저가 여러 개를 한꺼번에 부르기 때문이며
+            # 경로는 장소를 중심으로 짜여 있고 소유 서비스는 갈려 있음
+            #
+            # * 여기에 /** 를 쓰면 안 됨
+            #   하위 경로를 모두 먹어 나머지 다섯으로 갈 요청이 전부 첫 라우트로 감
+            #   게이트웨이는 처음 맞는 라우트에서 멈춤
+            #   증상은 "장소 상세에서 판정만 안 뜬다" 인데 게이트웨이 로그에는 아무것도 안 남음
+            #
+            # * {placeId} 는 한 마디만 맞추므로 여섯이 서로 겹치지 않음
+            #   그래서 순서를 신경 쓰지 않아도 되며 이것이 이렇게 적은 이유임
+            #
+            # * place 에 하위 경로가 새로 생기면 라우트도 함께 추가할 것
+            #   추가하지 않으면 404 가 남
+            - id: place-service
+              uri: lb://place-service
+              predicates:
+                - Path=/api/v1/places/{placeId},/api/v1/places/{placeId}/documents
+
+            - id: verdict-service
+              uri: lb://verdict-service
+              predicates:
+                - Path=/api/v1/places/{placeId}/verdict
+
+            - id: review-service
+              uri: lb://review-service
+              predicates:
+                - Path=/api/v1/places/{placeId}/reviews,/api/v1/reviews/**
+
+            - id: policy-service
+              uri: lb://policy-service
+              predicates:
+                - Path=/api/v1/places/{placeId}/conflicts
+
+            - id: congestion-service
+              uri: lb://congestion-service
+              predicates:
+                - Path=/api/v1/places/{placeId}/congestion
+
+            # ── 검색 ─────────────────────────────────────────
+            # /api/v1/search/** 가 /api/v1/search 자체도 맞추므로
+            # 검색 · 건수 · 자동완성 · 지도가 한 줄로 덮임
+            - id: search-service
+              uri: lb://search-service
+              predicates:
+                - Path=/api/v1/search/**
+
+            # ── 제보 · 알림 · 경로 ───────────────────────────
+            - id: report-service
+              uri: lb://report-service
+              predicates:
+                - Path=/api/v1/reports/**
+
+            - id: notification-service
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/v1/notifications/**
+
+            - id: route-service
+              uri: lb://route-service
+              predicates:
+                - Path=/api/v1/routes
+
+            # ── 관리자 ───────────────────────────────────────
+            # 두 번째 마디가 어느 서비스인지를 정함
+            # 예외 없이 이 규칙을 지키므로 새 관리자 경로를 만들 때도 같은 모양으로 둘 것
+            #
+            # 미발행 이벤트를 다시 보내는 기능이 각 서비스에 있으며
+            # 그 경로도 자기 접두사 아래에 둠 (예: /api/v1/admin/places/outbox)
+            # 그 일이 결국 그 서비스의 데이터를 고치는 것이기 때문임
+            - id: admin-accounts
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/v1/admin/accounts/**
+
+            - id: admin-pets
+              uri: lb://pet-service
+              predicates:
+                - Path=/api/v1/admin/pets/**
+
+            - id: admin-places
+              uri: lb://place-service
+              predicates:
+                - Path=/api/v1/admin/places/**
+
+            - id: admin-policies
+              uri: lb://policy-service
+              predicates:
+                - Path=/api/v1/admin/policies/**
+
+            - id: admin-reports
+              uri: lb://report-service
+              predicates:
+                - Path=/api/v1/admin/reports/**
+
+            - id: admin-verdicts
+              uri: lb://verdict-service
+              predicates:
+                - Path=/api/v1/admin/verdicts/**
+
+            - id: admin-search
+              uri: lb://search-service
+              predicates:
+                - Path=/api/v1/admin/search/**
