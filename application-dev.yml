@@ -12,6 +12,11 @@
 # =============================================================================
 
 app:
+  auth:
+    cookie:
+      # 컨테이너로 띄워 검증할 때도 아직 https 가 아니므로 끔
+      # nginx 에 인증서를 붙이는 시점에 prod 와 함께 켤 것
+      secure: false
   datasource:
     host: ${DB_HOST}
   logging:
