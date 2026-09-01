@@ -24,6 +24,23 @@ app:
       # 로컬에서 Loki 로 보내볼 일이 생기면 프로파일만 바꾸면 되도록 값은 채워 둠
       url: http://localhost:3100/loki/api/v1/push
 
+  oauth:
+    # 프론트와 콜백 주소는 브라우저가 오가는 값임
+    #
+    # 그래서 이 두 값만은 컨테이너 이름이 아니라 localhost 를 씀
+    # 브라우저는 도커 네트워크 바깥에 있어 kafka·redis 같은 이름을 풀지 못함
+    #
+    # 경로(/login/success · /login/error)는 여기 두지 않고 코드 상수로 둠
+    # 환경에 따라 달라지는 것은 호스트와 포트이지 경로가 아니기 때문임
+    frontend-base-url: http://localhost:5173
+    google:
+      # 구글이 사용자를 되돌려보낼 주소임
+      #
+      # 콘솔의 "승인된 리디렉션 URI" 와 한 글자도 다르면 redirect_uri_mismatch 가 남
+      # 콘솔에는 8080(게이트웨이 경유)과 8081(auth 직결)을 모두 등록해 두었으므로,
+      # auth 만 띄워 확인할 때는 이 값만 8081 로 바꾸면 됨
+      redirect-uri: http://localhost:8080/api/v1/auth/oauth/google/callback
+
 spring:
   data:
     redis:

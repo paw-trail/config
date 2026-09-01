@@ -23,6 +23,18 @@ app:
     loki:
       url: http://loki:3100/loki/api/v1/push
 
+  oauth:
+    # local 과 같은 값임
+    #
+    # 이 파일의 다른 주소들은 컨테이너 이름을 쓰지만 이 둘은 그러면 안 됨
+    # 브라우저가 찾아가는 주소이고 브라우저는 도커 네트워크 바깥에 있어
+    # gateway-server 같은 이름을 풀지 못함
+    #
+    # 프론트도 배포 검증 단계에서는 아직 호스트의 Vite 개발 서버로 뜸
+    frontend-base-url: http://localhost:5173
+    google:
+      redirect-uri: http://localhost:8080/api/v1/auth/oauth/google/callback
+
 spring:
   data:
     redis:
