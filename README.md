@@ -1,223 +1,608 @@
 # config
 
-함께하개(paw-trail)의 모든 서비스가 사용하는 설정 저장소입니다. 자바 코드는 한 줄도 없고 YAML 파일만 들어 있습니다.
-
-**주소와 포트만 모아 둔 곳이 아닙니다.** 아래처럼 동작을 결정하는 값도 이곳에 있으므로, 해당 기능을 고칠 때 서비스 저장소가 아니라 여기를 찾습니다.
-
-| 무엇 | 어느 파일 |
-|---|---|
-| **게이트웨이 라우팅 규칙** (어느 경로가 어느 서비스로 가는가) | `gateway-server.yml` |
-| **인증 없이 열어 둘 경로 목록** | `gateway-server.yml` |
-| **토큰 서명을 확인하는 공개키** | `gateway-server.yml` |
-| 서비스 레지스트리의 자기 주소 인식 | `eureka-server-{env}.yml` |
-| 데이터베이스 주소 · 계정 · 포트 | 계층별로 나뉨 (2장) |
-
-이 저장소를 읽어 각 서비스에 설정을 내려주는 애플리케이션은 `config-server` 이며 별도 저장소입니다. 이름이 비슷하므로 혼동하지 않도록 주의합니다.
+**함께하개의 설정 저장소입니다.** 서비스 17개의 설정값이 전부 여기 있습니다.
 
 ```
-paw-trail/config          이 저장소. YAML 파일 모음이며 실행되지 않습니다
-paw-trail/config-server   이 저장소를 읽어 서비스에 내려주는 스프링 애플리케이션
+서비스 기동  ──▶  설정 서버  ──▶  config 저장소
+                      │                 │
+                      │                 └──▶  GitHub 에서 yml 을 읽음
+                      │                       main 브랜치
+                      │
+                      └──▶  4계층을 순서대로 겹쳐 하나로 만들어 돌려줌
+
+        서비스는 자기 application.yml 에 세 줄만 두고 나머지를 여기서 받음
+
+        ⚠ 이 저장소는 공개임 — 비밀값은 ${환경변수} 자리만 남김
 ```
 
-**이 저장소는 공개되어 있습니다.** 비밀번호와 개인키는 어느 파일에도 넣지 않으며, 자리만 `${환경변수}` 형태로 남기고 실제 값은 각 컨테이너의 환경변수로 주입합니다. 자세한 목록은 5장에 있습니다.
+<br><br>
 
 ---
 
-## 1. 설정이 서비스에 도달하는 경로
+## 0. 이 저장소가 하는 일
 
-### 1-1. 서비스가 직접 찾아옵니다
+**설정을 저장소에 두면 이렇게 됩니다.**
 
-각 서비스는 기동할 때 자기 이름과 프로파일을 알리고 설정을 받아옵니다. 유레카를 거치지 않고 `config-server` 주소로 바로 찾아갑니다.
+| | 여기에 두면 | 각 서비스에 두면 |
+|---|---|---|
+| 값을 바꾸면 | **push 하면 끝** | 빌드 → 이미지 → 배포 |
+| DB 주소를 옮기면 | 한 줄 고침 | **14개 서비스를 다시 배포** |
+| 환경별 차이 | 파일로 갈림 | 코드에 분기 |
+| 값이 어디 있는지 | 여기 하나 | 저장소 17곳 |
+
+---
+
+**숫자로 보면 이렇습니다.**
+
+| | 값 | 어디에 |
+|---|---|---|
+| yml 파일 | **22개** | [1장](#1-파일-지도) |
+| 계층 | 4개 | [2장](#2-4계층--숫자가-큰-쪽이-이김) |
+| 서비스 파일 | 17개 | 도메인 14 + 플랫폼 2 + 템플릿 1 |
+| 환경 | 3개 | `local` · `dev` · `prod` |
+| 4계층 실사례 | 2개 | `eureka-server-{local,dev}.yml` |
+| **저장소 공개 여부** | **공개** | [4장](#4-비밀값은-여기-두지-않습니다) |
+
+---
+
+**이 저장소만의 특징 셋입니다.**
 
 ```
-서비스 기동
-   │
-   ├─→ "나는 auth-service, 프로파일은 dev" 라고 요청
-   │
-   ├─→ config-server 가 이 저장소에서 해당 파일들을 찾아 합침
-   │
-   └─→ 서비스는 합쳐진 설정 한 벌을 받습니다
+1  코드가 없음                 yml 22개와 README 뿐
+                              빌드도 CI 도 없음
+
+2  main 에 직접 커밋            이슈·PR·브랜치를 만들지 않음
+                              push 하면 설정 서버가 바로 읽음
+
+3  공개 저장소                  ⚠ 비밀값을 절대 적지 않음
+                              한 번 커밋하면 지워도 이력에 남음
 ```
 
-합치는 작업은 `config-server` 가 응답을 만들 때 끝내므로, 서비스 쪽에서는 계층이 보이지 않고 완성된 한 벌로 인식됩니다.
+<br><br>
 
-### 1-2. 서비스 저장소에 남는 것
+---
 
-각 서비스의 `src/main/resources/application.yml` 에는 세 줄만 남습니다.
+### 이 문서를 읽는 순서
+
+| 지금 하려는 일 | 볼 곳 |
+|---|---|
+| 어떤 파일이 있는지 보고 싶다 | [1장](#1-파일-지도) |
+| 계층이 뭔지 모르겠다 | [2장](#2-4계층--숫자가-큰-쪽이-이김) |
+| 새 값을 넣어야 하는데 어디 둘지 모르겠다 | [3장](#3-값을-어디에-둘지-정하기) |
+| 비밀번호·키를 넣어야 한다 | [4장](#4-비밀값은-여기-두지-않습니다) |
+| 새 서비스를 등록해야 한다 | [5장](#5-새-서비스-등록하기) |
+| 고쳤는데 반영이 안 된다 | [6장](#6-값이-언제-반영되나) |
+| 뭔가 안 된다 | [7장](#7-막히기-쉬운-자리) |
+| "왜 이렇게 만들었지" | [8장](#8-왜-이렇게-만들었나) |
+| 아직 안 채운 것이 궁금하다 | [9장](#9-아직-안-한-것) |
+
+> **서비스를 만드는 사람이 실제로 하는 일은 [5장](#5-새-서비스-등록하기) 하나입니다.**
+> 파일 하나를 만들고 게이트웨이 라우트를 여는 것이 전부입니다.
+
+<br><br>
+
+---
+
+## 1. 파일 지도
+
+```
+paw-trail/config
+│
+├── application.yml               1계층   모든 서비스 · 모든 환경        178줄
+│
+├── application-local.yml         3계층   IntelliJ 로 띄울 때            75줄
+├── application-dev.yml           3계층   로컬 컨테이너                  62줄
+├── application-prod.yml          3계층   AWS EC2                       81줄 (거의 TODO)
+│
+├── 플랫폼 (2개)
+│   ├── gateway-server.yml        2계층   ★라우트 19 · 공개키 · 인증예외  293줄
+│   ├── eureka-server.yml         2계층                                  44줄
+│   ├── eureka-server-local.yml   4계층   ★실사례                        25줄
+│   └── eureka-server-dev.yml     4계층   ★실사례                        15줄
+│
+├── 도메인 서비스 (14개)
+│   ├── auth-service.yml          2계층   ★제일 큼 — JWT · 메일 · OAuth  238줄
+│   ├── user-service.yml                  17줄
+│   ├── pet-service.yml                   23줄
+│   ├── place-service.yml                 23줄
+│   ├── policy-service.yml                23줄
+│   ├── search-service.yml                17줄
+│   ├── report-service.yml                23줄
+│   ├── review-service.yml                17줄
+│   ├── notification-service.yml          17줄
+│   ├── verdict-service.yml               12줄   DB 없음 — 포트만
+│   ├── congestion-service.yml            12줄   DB 없음
+│   ├── route-service.yml                 12줄   DB 없음
+│   ├── ingest-service.yml                23줄   배치 — auditor 를 덮음
+│   └── extract-service.yml               30줄   배치
+│
+└── template-service.yml          2계층   service-template 을 그대로 띄울 때
+```
+
+> **`config-server.yml` 이 없습니다.** 설정 서버는 **자기 설정을 이 저장소에서
+> 받지 않습니다.** 저장소 주소를 알아야 저장소를 읽을 수 있기 때문입니다.
+> 그 값들은 `config-server` 저장소 안에 있습니다.
+
+<br><br>
+
+---
+
+### 1-1. 파일 크기가 갈리는 이유
+
+```
+293줄  gateway-server    라우트 19개 · 공개키 PEM · 인증 예외 9줄
+238줄  auth-service      JWT · SMTP · OAuth · 쿠키 · permit-all 9줄
+ 23줄  place-service     포트 · DB · outbox 스위치
+ 12줄  verdict-service   포트만
+```
+
+**대부분의 서비스는 짧습니다.** 공통값이 1계층에, 주소가 3계층에 있어서
+**2계층에는 그 서비스만의 것만 남습니다.**
+
+---
+
+**12줄짜리 파일의 전부입니다.**
 
 ```yaml
-spring:
-  application:
-    name: auth-service
-  config:
-    import: "optional:configserver:http://${CONFIG_HOST:localhost}:8888"
-  profiles:
-    default: local
+# =============================================================================
+# 2계층 — verdict-service
+# =============================================================================
+# 판정 담당임
+#
+# DB 를 쓰지 않으므로 datasource 를 두지 않음
+# outbox 도 없어 relay 스위치를 적지 않음
+# =============================================================================
+
+server:
+  port: 8086
 ```
 
-`optional:` 을 붙이는 이유는 `config-server` 가 떠 있지 않아도 서비스가 기동되게 하기 위함입니다. 서비스 하나만 IntelliJ로 띄워 확인하는 작업이 자주 있으므로 이 접두사가 없으면 매번 `config-server` 를 함께 띄워야 합니다.
-
-`${CONFIG_HOST:localhost}` 에 기본값을 붙이는 것은 의도입니다. 이 세 줄은 **서비스 저장소**에 있는 값이며, 로컬에서는 언제나 `localhost:8888` 이므로 기본값이 정답입니다. 기본값이 없으면 개발자마다 IntelliJ 실행 구성에 환경변수를 넣어야 합니다. 컨테이너와 AWS에서만 `CONFIG_HOST` 를 지정해 덮어씁니다.
-
-**이 저장소 안의 파일에는 기본값을 붙이지 않습니다.** 이유는 5장에 있습니다.
+<br><br>
 
 ---
 
-## 2. 4계층 구조
-
-### 2-1. 덮어쓰기 순서
-
-`config-server` 는 네 파일을 찾아 합칩니다. **계층 번호가 곧 세기이며, 숫자가 큰 쪽이 이깁니다.**
-
-| 계층 | 파일 | 적용 범위 |
-|:---:|---|---|
-| 1 | `application.yml` | 모든 서비스 · 모든 환경 |
-| 2 | `{서비스명}.yml` | 해당 서비스 · 모든 환경 |
-| 3 | `application-{env}.yml` | 모든 서비스 · 해당 환경만 |
-| 4 | `{서비스명}-{env}.yml` | 해당 서비스 · 해당 환경만 |
-
-**"구체적인 파일이 이긴다"가 아닙니다.** 규칙은 두 겹입니다.
-
-1. 프로파일이 붙은 파일이 안 붙은 파일을 이깁니다
-2. 같은 조건 안에서는 서비스별 파일이 공통 파일을 이깁니다
-
-그래서 **환경별 공통 파일(3계층)이 서비스별 파일(2계층)을 이깁니다.** 이 순서는 같은 키를 여러 계층에 넣고 실제로 어느 값이 적용되는지 확인한 결과입니다.
-
-### 2-2. 파일명은 `spring.application.name` 과 같아야 합니다
-
-파일명이 다르면 **오류 없이 그 계층만 빠진 채 내려갑니다.** 값이 반영되지 않는데 아무 메시지도 없다면 이것을 먼저 확인합니다.
-
-이 이름은 저장소 이름, 컨테이너 이미지 이름, 유레카 등록 이름과도 같게 유지합니다.
+### 1-2. 이름 규칙
 
 ```
-저장소명 = 이미지명 = spring.application.name = 이 저장소의 파일명 = 유레카 서비스 ID
+<서비스명>.yml              2계층
+<서비스명>-<환경>.yml         4계층
+application.yml            1계층
+application-<환경>.yml       3계층
 ```
 
-### 2-3. 4계층은 되도록 비웁니다
-
-서비스 14개와 환경 3개를 곱하면 파일이 42개까지 늘어날 수 있습니다. 그러나 그중 대부분은 2계층에 있어야 할 값을 잘못 내려놓은 경우입니다.
-
-예를 들어 `auth-service` 의 포트 8081은 환경이 바뀌어도 8081이므로 2계층에 둡니다. 4계층에 들어갈 값은 **이 서비스가 이 환경에서만 다르게 동작하는 것**뿐입니다.
-
-**다만 쓸 때는 정확히 4계층에 써야 합니다.** 3계층이 2계층을 이기므로, 환경별 공통값을 특정 서비스만 다르게 하고 싶을 때 2계층에 적으면 덮여서 반영되지 않습니다. 이 경우가 4계층을 쓰는 유일한 자리입니다.
-
-#### 실제 사례 — `eureka-server-{env}.yml`
-
-지금 4계층 파일을 가진 것은 서비스 레지스트리 하나뿐이며, 위 조건에 정확히 들어맞습니다.
-
-서비스 레지스트리는 설정에 적힌 주소 목록을 **다른 레지스트리 서버의 목록**으로 읽고, 그중 자기 자신은 빼야 합니다. 그런데 자기인지 판단할 때 주소를 글자 그대로 비교하는데, 3계층이 주는 두 값이 서로 다릅니다.
+**`<서비스명>` 은 그 서비스의 `spring.application.name` 과 정확히 같아야 합니다.**
 
 ```
-eureka.instance.hostname                 host.docker.internal
-eureka.client.service-url.defaultZone    http://localhost:8761/eureka/
+auth-service/src/main/resources/application.yml
+  spring.application.name: auth-service
+                                │
+                                └──▶  config 저장소의 auth-service.yml 을 찾음
 ```
 
-그래서 자기를 남으로 보고, 자기에게 복제하려다 **기동에 실패합니다.** `eureka.server.my-url` 을 주소 목록과 정확히 같게 지정하면 자기로 인식합니다.
-
-이 값은 환경마다 다르므로 2계층에 한 번만 둘 수 없고, 3계층이 2계층을 이기므로 2계층에 적으면 덮입니다. **4계층이 유일한 자리입니다.**
-
-| 파일 | 값 |
-|---|---|
-| `eureka-server-local.yml` | `http://localhost:8761/eureka/` |
-| `eureka-server-dev.yml` | `http://eureka-server:8761/eureka/` |
-
-**3계층의 `defaultZone` 을 고칠 때는 이 값도 함께 고칩니다.** 두 값은 슬래시 하나까지 같아야 합니다.
+> **다르면 오류 없이 그 계층만 빠진 채 내려갑니다.** 증상은 **포트가 스프링
+> 기본값 8080 으로 뜨는 것**입니다.
 
 ---
 
-## 3. 환경 프로파일
+**환경 이름에 하이픈을 쓰지 않습니다.**
 
-프로파일은 3개이며, 축의 기준은 **어디에서 실행되는가** 입니다.
+```
+설정 서버는 파일명에서 서비스명과 환경을 하이픈으로 가름
+        │
+        └── auth-service-local.yml
+              ↑ 어디까지가 서비스명이고 어디부터가 환경인가
+                  우리 서비스명이 전부 하이픈을 포함하므로
+                  환경까지 하이픈이 있으면 경계를 못 찾음
+```
 
-| 프로파일 | 실행 위치 | 접속 대상의 예 |
-|---|---|---|
-| `local` | IntelliJ에서 직접 실행 | 호스트에서 컨테이너를 바라봄 (`localhost:29092`) |
-| `dev` | 로컬 `docker compose` 의 `app` 프로파일 | 같은 도커 네트워크 안 (`kafka:9092`) |
-| `prod` | AWS EC2 | 노드가 나뉘어 있어 사설 IP를 사용 |
+**그래서 `local` · `dev` · `prod` 입니다.** `local-test` 같은 이름은 안 됩니다.
 
-`local` 과 `dev` 는 같은 PC에서 돌지만 접속 주소가 다릅니다. 한 프로파일로 묶으면 두 주소를 한 파일에 담을 수 없습니다.
-
-프로파일을 지정하지 않으면 `local` 로 동작합니다. 서비스의 `application.yml` 에 `spring.profiles.default: local` 이 들어 있기 때문이며, 컨테이너에서는 Compose의 `SPRING_PROFILES_ACTIVE=dev` 가 이깁니다.
+<br><br>
 
 ---
 
-## 4. 값을 어디에 두는가
-
-### 4-1. 판단 기준
-
-값을 하나 추가할 때 아래 2가지만 판단합니다.
+## 2. 4계층 — 숫자가 큰 쪽이 이김
 
 ```
-                  ┌─────────────────┬───────────────────────┐
-                  │   환경 무관      │   환경마다 다름         │
- ┌────────────────┼─────────────────┼───────────────────────┤
- │  모든 서비스    │ application.yml │ application-{env}.yml │
- │                │      1계층       │        3계층           │
- ├────────────────┼─────────────────┼───────────────────────┤
- │  서비스마다     │ {서비스명}.yml   │ {서비스명}-{env}.yml   │
- │                │      2계층       │        4계층           │
- └────────────────┴─────────────────┴───────────────────────┘
+place-service 가 local 프로파일로 뜰 때
+
+  1계층  application.yml               모든 서비스 · 모든 환경
+           ddl-auto: validate
+           flyway.locations · out-of-order
+           kafka 직렬화기 · observation
+           datasource.password: ${SERVICE_DB_PASSWORD}
+           auditor.system-name: SYSTEM
+           outbox.relay.enabled: false
+           │
+           ▼  같은 키가 있으면 아래가 덮음
+  2계층  place-service.yml             place · 모든 환경
+           server.port: 8084
+           datasource.url · username
+           outbox.relay.enabled: true       ← 1계층의 false 를 덮음
+           │
+           ▼
+  3계층  application-local.yml         모든 서비스 · local 만
+           app.datasource.host: ${DB_HOST}
+           redis · kafka · eureka · zipkin 주소
+           cookie.secure: false
+           │
+           ▼
+  4계층  place-service-local.yml       place · local 만
+           (파일 없음 — 건너뜀)
+           │
+           ▼
+  최종   port 8084 · outbox true · host=환경변수 · kafka localhost:29092 · ddl validate
 ```
 
-애매하면 **번호가 작은 계층**에 둡니다. 나중에 큰 번호에서 덮어쓰는 것이 반대보다 쉽습니다.
-
-### 4-2. 계층별 예시
-
-| 계층 | 파일 | 들어가는 값 |
-|:---:|---|---|
-| 1 | `application.yml` | `ddl-auto`, Flyway `locations`, 로깅 패턴, 액추에이터 노출 범위, Kafka 직렬화기와 Observation, 데이터베이스 비밀번호 참조 |
-| 2 | `{서비스명}.yml` | 포트, 데이터베이스 이름과 계정, `app.auditor.system-name`, `app.outbox.relay.enabled`, **그 서비스만의 동작 설정** |
-| 3 | `application-{env}.yml` | 데이터베이스 호스트, Kafka 부트스트랩 주소, Redis 주소, 유레카 주소, Loki · Zipkin 주소 |
-| 4 | `{서비스명}-{env}.yml` | 되도록 비워 둡니다 (2-3 참고) |
-
-2계층의 **그 서비스만의 동작 설정**이 실제로 무엇인지는 서비스마다 다릅니다. 지금 들어 있는 것은 아래와 같습니다.
-
-| 파일 | 그 서비스만의 값 |
-|---|---|
-| `gateway-server.yml` | **라우팅 규칙 19개**, **인증 없이 열어 둘 경로 7개**, **RS256 공개키**, 토큰에서 값을 꺼낼 이름, 액추에이터 `gateway` 노출 |
-| `eureka-server.yml` | 자기 등록 여부, 레지스트리 수신 여부, 자기보호 모드 |
-| `ingest-service.yml` · `extract-service.yml` | (구현 시) 배치 관련 설정 |
-
-**라우팅 규칙을 서비스 저장소가 아니라 여기에 두는 이유**는 도메인 서비스가 하나씩 완성될 때마다 라우트를 열어야 하기 때문입니다. 게이트웨이 저장소에 있으면 그때마다 이미지를 다시 만들고 무중단 배포를 한 번씩 돌게 됩니다. 여기 있으면 커밋하고 `/actuator/refresh` 를 부르면 끝납니다.
-
-대신 **이 파일의 오타 하나가 특정 경로 전체를 404로 만듭니다.** 고친 뒤에는 8장의 대조 확인을 습관으로 둡니다.
+<br><br>
 
 ---
 
-## 5. 이 저장소에 넣지 않는 것
+### 2-1. 세기 규칙은 두 겹입니다
 
-### 5-1. 환경변수로 빼는 값
+```
+"구체적인 파일이 이긴다" 가 아님. 규칙이 두 겹임
 
-| 값 | 비고 |
-|---|---|
-| 서비스 계정 비밀번호 | 데이터베이스 10개분 |
-| **RS256 개인키** | 유출되면 누구나 유효한 토큰을 만들 수 있습니다 |
-| 카카오 REST 키 · 시크릿 | |
-| 공공데이터 `serviceKey` | 호출 쿼터가 붙어 있습니다 |
-| SMTP 앱 비밀번호 | |
-| S3 자격증명 | |
-| `local` 프로파일의 데이터베이스 호스트 | 공인 IP이며 5432가 열려 있습니다 |
+  ① 프로파일이 붙은 파일이 안 붙은 파일을 이김
+        application-local.yml  >  place-service.yml
+        (3계층이 2계층을 이김)
 
-**RS256 공개키는 이 저장소에 둡니다.** 서명 검증에만 쓰이므로 공개되어도 무해하며, 실제로 `gateway-server.yml` 의 `app.jwt.public-key` 에 들어 있습니다. 개인키는 인증 서비스만 가지며 환경변수로 주입합니다.
+  ② 같은 조건 안에서는 서비스별 파일이 공통 파일을 이김
+        place-service.yml       >  application.yml         (2 > 1)
+        place-service-local.yml >  application-local.yml   (4 > 3)
 
-같은 키 쌍이라도 다루는 방식이 갈립니다.
 
-| | 어디에 | 왜 |
-|---|---|---|
-| 개인키 | 환경변수 | 유출되면 누구나 유효한 토큰을 만들 수 있습니다 |
-| 공개키 | **이 저장소** | 확인만 되고 만들 수는 없어 공개되어도 무해합니다 |
+  환경별 공통값을 특정 서비스만 다르게 하려면
+        ⛔ 2계층에 적으면 3계층에 덮임
+        ✅ 4계층에 적어야 함
+```
 
-비밀 값은 자리만 남기고 실제 값을 넣지 않습니다.
+---
+
+**실제로 그 자리를 쓰고 있는 것이 `eureka-server` 입니다.**
 
 ```yaml
+# 2계층 — eureka-server.yml     (환경 무관)
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+
+# 4계층 — eureka-server-local.yml
+eureka:
+  server:
+    my-url: http://localhost:8761/eureka/
+
+# 4계층 — eureka-server-dev.yml
+eureka:
+  server:
+    my-url: http://eureka-server:8761/eureka/
+```
+
+**3계층(`application-local.yml`)에 두면 모든 서비스가 그 값을 받습니다.**
+유레카 자신만 필요한 값이라 4계층이 맞습니다.
+
+<br><br>
+
+---
+
+### 2-2. 각 계층에 무엇이 있나
+
+**1계층 — `application.yml` (178줄)**
+
+| 블록 | 무엇 |
+|---|---|
+| `spring.datasource.password` | `${SERVICE_DB_PASSWORD}` — 계정 10개가 공유 |
+| `spring.cloud.refresh` | **DataSource 를 refresh 대상에 넣음** — [6장](#6-값이-언제-반영되나) |
+| `spring.jpa` | `ddl-auto: validate` · `open-in-view: false` |
+| `spring.flyway` | `locations` 두 곳 · `out-of-order: true` |
+| `spring.kafka` | 직렬화기 · `observation-enabled` 둘 |
+| `management` | 액추에이터 노출 · 추적 샘플링 1.0 |
+| `app.auditor.system-name` | `SYSTEM` |
+| `app.outbox.relay.enabled` | **`false`** — 발행하는 서비스만 2계층에서 켬 |
+
+---
+
+**2계층 — `<서비스명>.yml`**
+
+```
+포트                         전부
+datasource.url · username   DB 를 쓰는 서비스만
+outbox.relay.enabled: true   이벤트를 발행하는 서비스만
+auditor.system-name          배치만 (ingest-batch · extract-batch)
+그 서비스만의 값               auth 의 JWT · 메일 · OAuth
+                            gateway 의 라우트 · 공개키
+```
+
+---
+
+**3계층 — `application-{env}.yml`**
+
+**환경마다 바뀌는 것은 사실상 "주소" 입니다.**
+
+| 값 | `local` | `dev` | `prod` |
+|---|---|---|---|
+| `app.datasource.host` | `${DB_HOST}` | `${DB_HOST}` | TODO |
+| Redis | `localhost:6379` | `redis:6379` | TODO |
+| Kafka | `localhost:29092` | `kafka:9092` | TODO |
+| 유레카 | `localhost:8761` | `eureka-server:8761` | TODO |
+| Zipkin | `localhost:9411` | `zipkin:9411` | TODO |
+| Loki | `localhost:3100` | `loki:3100` | TODO |
+| `cookie.secure` | `false` | `false` | (아직) |
+
+> **`local` 과 `dev` 가 갈리는 이유** — `local` 은 IntelliJ 가 도커 밖에서 돌아
+> `localhost` 로 붙고, `dev` 는 컨테이너 안이라 **`localhost` 가 자기 자신**이라서
+> 컨테이너 이름으로 붙습니다.
+
+---
+
+**4계층 — `<서비스명>-{env}.yml`**
+
+**되도록 비워 둡니다.** 지금 유레카 둘뿐입니다.
+
+<br><br>
+
+---
+
+### 2-3. 유레카 등록 방식이 환경마다 다릅니다
+
+```yaml
+# application-local.yml
+eureka:
+  instance:
+    hostname: host.docker.internal
+    prefer-ip-address: false
+
+# application-dev.yml
+eureka:
+  instance:
+    prefer-ip-address: true
+```
+
+```
+local   IntelliJ 가 호스트에서 돎
+          │
+          └──▶  host.docker.internal 로 등록
+                  ★컨테이너 안의 게이트웨이가 이 이름으로 호스트를 찾음
+                    한 이름이 호스트·컨테이너 양쪽에서 통함
+
+dev     컨테이너 안에서 돎
+          │
+          └──▶  도커 네트워크 IP 로 등록
+                  같은 네트워크라 IP 로 바로 닿음
+```
+
+**이것 덕분에 IntelliJ 로 띄운 서비스도 게이트웨이가 찾아냅니다.**
+
+<br><br>
+
+---
+
+### 2-4. 실제로 받은 값 확인하기
+
+```
+http://localhost:8888/{서비스명}/{환경}
+```
+
+**macOS**
+
+```bash
+curl http://localhost:8888/place-service/local
+```
+
+**Windows (PowerShell)**
+
+```powershell
+curl.exe http://localhost:8888/place-service/local
+```
+
+응답의 `propertySources` 배열이 **어느 파일에서 온 값인지까지 보여 주며,
+배열 앞이 우선순위가 높은 쪽**입니다.
+
+```json
+{
+  "name": "place-service",
+  "profiles": ["local"],
+  "propertySources": [
+    { "name": "...config/application-local.yml", "source": { } },
+    { "name": "...config/place-service.yml",     "source": { } },
+    { "name": "...config/application.yml",       "source": { } }
+  ]
+}
+```
+
+> **`.yml` · `.properties` · `.json` 주소는 쓸 수 없습니다.**
+>
+> ```
+> http://localhost:8888/place-service-local.yml     →  400
+> ```
+>
+> 설정 서버가 그 주소에서 **서비스명과 환경을 하이픈으로 가르는데**
+> 우리 서비스명이 전부 하이픈을 포함하고 있습니다.
+
+---
+
+**`${...}` 는 치환되지 않은 채로 내려옵니다.**
+
+```json
+"spring.datasource.password": "${SERVICE_DB_PASSWORD}"
+```
+
+**설정 서버는 문자열 그대로 보내고 각 서비스가 자기 환경변수로 해석합니다.**
+이것이 **공개 저장소로 둘 수 있는 전제**입니다.
+
+<br><br>
+
+---
+
+## 3. 값을 어디에 둘지 정하기
+
+```
+새 값을 넣을 때
+
+        서비스마다 다른가?
+              │
+        ┌─────┴─────┐
+       예           아니오
+        │             │
+        ▼             ▼
+  환경마다 다른가?   환경마다 다른가?
+        │                 │
+   ┌────┴────┐       ┌────┴────┐
+  예        아니오    예        아니오
+   │          │       │          │
+   ▼          ▼       ▼          ▼
+ 4계층      2계층    3계층      1계층
+{svc}-{env}  {svc}   app-{env}   app
+
+
+  애매하면 번호가 작은 쪽에 둘 것
+  나중에 큰 번호에서 덮어쓰는 것이 반대보다 쉬움
+```
+
+<br><br>
+
+---
+
+### 3-1. 실제 사례로 보기
+
+| 값 | 서비스마다? | 환경마다? | 어디에 |
+|---|---|---|---|
+| `ddl-auto: validate` | 아니오 | 아니오 | **1계층** |
+| `server.port: 8084` | 예 | 아니오 | **2계층** |
+| Redis 주소 | 아니오 | 예 | **3계층** |
+| `eureka.server.my-url` | 예 | 예 | **4계층** |
+
+---
+
+**`app.outbox.relay.enabled` 가 좋은 예입니다.**
+
+```
+1계층   enabled: false          기본값 — 대부분의 서비스는 발행을 안 함
+          │
+          ▼
+2계층   enabled: true           발행하는 서비스만 켬
+                                auth · place · policy · pet · report
+```
+
+**기본값을 "꺼짐" 으로 둔 이유** — 켜는 것을 잊으면 이벤트가 5초 늦게 나갈 뿐이지만,
+**끄는 것을 잊으면 여러 인스턴스가 같은 행을 집어 순서 보장이 깨집니다.**
+
+---
+
+**`app.auditor.system-name` 도 같은 모양입니다.**
+
+```
+1계층   SYSTEM              전부
+2계층   ingest-batch        ingest 만
+        extract-batch       extract 만
+```
+
+<br><br>
+
+---
+
+### 3-2. 기본값을 박지 않습니다
+
+```yaml
+# ⛔ 이렇게 쓰지 않습니다
+password: ${SERVICE_DB_PASSWORD:1234}
+host: ${DB_HOST:localhost}
+```
+
+```
+환경변수를 빠뜨려도 그냥 붙어 버림
+        │
+        └── 누락이 영영 안 드러남
+              EC2 로 옮길 때 환경변수를 안 넣은 사람이
+              조용히 로컬 DB 에 붙게 됨 — 그편이 더 나쁨
+```
+
+**환경변수가 없으면 기동이 실패하는 편이 낫습니다.**
+
+> `${CONFIG_HOST:localhost}` 만 예외입니다. 그건 **저장소가 아니라 서비스의
+> `application.yml`** 에 있고, **설정 서버 주소는 로컬에서 언제나 `localhost:8888`**
+> 이라 기본값이 정답입니다.
+
+<br><br>
+
+---
+
+### 3-3. 값이 다른 키를 참조할 수 있습니다
+
+```yaml
+# 2계층 — place-service.yml
 spring:
   datasource:
-    password: ${SERVICE_DB_PASSWORD}
+    url: jdbc:postgresql://${app.datasource.host}:5432/place_db
+
+# 3계층 — application-local.yml
+app:
+  datasource:
+    host: ${DB_HOST}
 ```
 
-반대로 공개키는 값을 그대로 적습니다. `openssl` 이 출력한 것을 **가공하지 않고 여러 줄 그대로** 넣습니다.
+```
+합친 뒤에 풀림
+        │
+        └── 2계층의 url 이 3계층의 host 를 쓸 수 있음
+              계층 순서와 무관하게 최종 결과에서 해석됨
+```
+
+**`app.datasource.host` 한 줄이 DB 주소의 단일 출처입니다.**
+DB 를 옮길 때 고치는 자리가 **3계층의 그 한 줄뿐**입니다.
+
+<br><br>
+
+---
+
+## 4. 비밀값은 여기 두지 않습니다
+
+**⚠ `paw-trail/config` 는 공개 저장소입니다.**
+
+```
+비밀번호 · 개인키 · API 시크릿
+        │
+        └── 어느 계층에도 넣지 않음
+              자리만 ${환경변수} 로 남김
+```
+
+<br><br>
+
+---
+
+### 4-1. 무엇이 갈리나
+
+| | config 저장소 | 환경변수 |
+|---|---|---|
+| DB 비밀번호 | | ✓ `SERVICE_DB_PASSWORD` |
+| RS256 **개인키** | | ✓ `AUTH_JWT_PRIVATE_KEY_B64` |
+| RS256 **공개키** | ✓ PEM 원본 그대로 | |
+| Gmail 앱 비밀번호 | | ✓ `AUTH_MAIL_PASSWORD` |
+| 구글 클라이언트 **시크릿** | | ✓ `AUTH_OAUTH_GOOGLE_CLIENT_SECRET` |
+| 구글 클라이언트 **ID** | ✓ 값 그대로 | |
+| DB 호스트 | | ✓ `DB_HOST` (사람마다 다름) |
+| 포트 · 만료 시간 · 경로 | ✓ | |
+
+---
+
+**기준은 "새면 무엇을 할 수 있나" 입니다.**
+
+```
+공개키       확인만 되고 만들 수는 없음        →  공개돼도 무해
+개인키       누구나 유효한 토큰을 만들 수 있음   →  절대 안 됨
+
+클라이언트 ID  authorize URL 에 실려 주소창에 뜸
+             남이 알아도 등록된 redirect URI 로만 되돌아감  →  무해
+클라이언트 시크릿  토큰 교환에 쓰임                        →  절대 안 됨
+```
+
+---
+
+**공개키는 블록 스칼라로 둡니다.**
 
 ```yaml
+# gateway-server.yml
 app:
   jwt:
     public-key: |
@@ -226,177 +611,601 @@ app:
       -----END PUBLIC KEY-----
 ```
 
-**여러 줄 표기이므로 들여쓰기가 어긋나면 값이 잘립니다.** 그러면 게이트웨이가 기동할 때 키를 읽지 못해 실패합니다. 조용히 지나가지는 않지만, 고친 뒤에는 설정 서버가 실제로 내려주는 값에 줄바꿈이 살아 있는지 확인합니다.
+> **들여쓰기가 일정해야 합니다.** 어긋나면 게이트웨이가 키 파싱에 실패하고
+> 기동이 막힙니다.
+>
+> **Base64 한 줄로 벗기지 않는 이유** — 헤더·개행을 손대다 한 글자만 틀려도
+> *"서명 검증 실패"* 로만 나타나 원인 추적이 고약합니다.
 
-```powershell
-curl.exe http://localhost:8888/gateway-server/local
-```
-
-머리와 꼬리 줄을 떼거나 한 줄로 잇지 않습니다. 손대다 한 글자만 틀려도 **"서명 검증 실패"로만 나타나** 원인을 찾기 어렵습니다.
-
-**배포할 때는 키 쌍을 새로 만들고 이 값도 함께 바꿉니다.** 지금 것은 로컬 개발용이며 개인키가 각자 환경에 흩어져 있습니다. 두 값이 짝이 아니면 모든 요청이 401이 됩니다.
-
-**이 저장소의 파일에는 기본값을 함께 적지 않습니다.** `${DB_PASSWORD:1234}` 처럼 쓰면 환경변수를 빠뜨려도 접속이 되어 버려 누락이 영영 드러나지 않습니다. 환경변수가 없으면 기동이 실패하는 편이 낫습니다.
-
-서비스 저장소의 `${CONFIG_HOST:localhost}` 처럼 비밀이 아니면서 로컬 값이 정해져 있는 것은 예외이며, 그 판단은 1-2에 적었습니다.
-
-### 5-2. 커밋한 값은 지워도 이력에 남습니다
-
-되돌리려면 이력을 다시 써야 하고, 그 전에 저장소를 내려받은 사람에게는 그대로 남습니다. 비밀 값을 실수로 커밋했다면 되돌리는 것으로 끝나지 않으며 **해당 키를 새로 발급해야 합니다.**
-
-저장소 설정에서 Secret Scanning과 Push Protection을 켜 두었습니다. 다만 카카오·AWS 토큰처럼 형식이 알려진 값만 걸러내며, 임의의 문자열로 된 비밀번호는 잡지 못합니다.
+<br><br>
 
 ---
 
-## 6. 파일 목록
-
-파일은 모두 저장소 루트에 둡니다. 하위 디렉터리를 쓰려면 `config-server` 에 탐색 경로 설정이 추가로 필요하고, 잘못 지정하면 **오류 없이 파일을 찾지 못합니다.**
-
-### 6-1. 공통
+### 4-2. 실수로 넣었다면
 
 ```
-application.yml
-application-local.yml
-application-dev.yml
-application-prod.yml
+한 번 커밋한 값은 지워도 이력에 남음
+        │
+        └── 되돌리는 것으로 끝나지 않음
+              그 키를 새로 발급해야 함
 ```
 
-### 6-2. 플랫폼
+| 무엇 | 어떻게 |
+|---|---|
+| DB 비밀번호 | `infra/.env` 를 바꾸고 DB 를 다시 만듦 |
+| RS256 키 | **새 쌍을 만들고 개인키·공개키를 함께 교체** — `gateway-server` README 7-2 |
+| Gmail 앱 비밀번호 | 구글 계정에서 폐기하고 재발급 |
+| 구글 시크릿 | 클라우드 콘솔에서 재발급 |
 
-| 파일 | 계층 | 들어 있는 값 |
-|---|:---:|---|
-| `gateway-server.yml` | 2 | 포트 8080, **라우팅 규칙**, **인증 없이 열어 둘 경로**, **RS256 공개키**, 액추에이터 `gateway` 노출 |
-| `eureka-server.yml` | 2 | 포트 8761, 자기 등록 여부, 레지스트리 수신 여부, 자기보호 모드 |
-| `eureka-server-local.yml` | 4 | 자기 주소 인식 (2-3 참고) |
-| `eureka-server-dev.yml` | 4 | 위와 같음 |
+<br><br>
 
-`config-server` 는 자기 설정을 이 저장소에서 받지 못합니다. 저장소 주소를 알아야 저장소를 읽을 수 있기 때문입니다. `config-server` 의 설정은 그 저장소의 `application.yml` 과 환경변수에 둡니다.
+---
 
-### 6-3. 도메인
+## 5. 새 서비스 등록하기
 
-| 파일 | 포트 | 데이터베이스 |
+**서비스를 만드는 사람이 이 저장소에서 하는 일은 이것뿐입니다.**
+
+```
+① config 저장소를 clone            처음 한 번
+        │
+        ▼
+② <서비스명>.yml 을 루트에 만듦      2계층
+        │
+        ▼
+③ gateway-server.yml 에 라우트 추가
+        │
+        ▼
+④ 인증 없이 열 경로가 있으면 permit-all 에도
+        │
+        ▼
+⑤ main 에 커밋 · push              이슈·PR 없이
+        │
+        ▼
+⑥ 확인   curl :8888/<서비스명>/local
+```
+
+<br><br>
+
+---
+
+### 5-1. ② 서비스 파일 만들기
+
+**DB 를 쓰는 서비스**
+
+```yaml
+# =============================================================================
+# 2계층 — place-service
+# =============================================================================
+# 장소 담당임
+#
+# 호스트는 3계층의 app.datasource.host 에서 오고 비밀번호는 1계층에 있음
+# 계정 10개가 같은 비밀번호를 쓰므로 여기에는 계정명만 둠
+# =============================================================================
+
+server:
+  port: 8084
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${app.datasource.host}:5432/place_db
+    username: place_svc
+
+app:
+  outbox:
+    relay:
+      # place.updated 를 발행함
+      # 단일 인스턴스라 켜도 같은 행을 두 번 집을 일이 없음
+      enabled: true
+```
+
+**DB 를 안 쓰는 서비스**
+
+```yaml
+server:
+  port: 8086
+```
+
+---
+
+| 값 | 규칙 |
+|---|---|
+| `server.port` | `service-template` README 4-5 의 배정표 |
+| `username` | **`<서비스>_svc`** — `_user` 가 아닙니다 |
+| `url` 의 DB 이름 | `<서비스>_db` (`ingest` 만 `raw_db`) |
+| `outbox.relay.enabled` | 이벤트를 발행하는 서비스만 `true` |
+| `auditor.system-name` | **배치만** — `ingest-batch` · `extract-batch` |
+
+> **주석을 다는 형태를 지킵니다.** 파일 첫머리에 계층 · 서비스명 · 담당 · 값의
+> 출처를 적습니다. 나중에 보는 사람이 **"이 값이 어디서 오나" 를 파일 안에서
+> 알 수 있어야 합니다.**
+
+<br><br>
+
+---
+
+### 5-2. ③ 게이트웨이 라우트
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/v1/auth/**
+
+            - id: place-service                        # ← 추가
+              uri: lb://place-service
+              predicates:
+                - Path=/api/v1/places/{placeId},/api/v1/places/{placeId}/documents
+```
+
+| 항목 | 규칙 | 어기면 |
 |---|---|---|
-| `auth-service.yml` | 8081 | `auth_db` |
-| `user-service.yml` | 8082 | `user_db` |
-| `pet-service.yml` | 8083 | `pet_db` |
-| `place-service.yml` | 8084 | `place_db` |
-| `policy-service.yml` | 8085 | `policy_db` |
-| `verdict-service.yml` | 8086 | 없음 |
-| `search-service.yml` | 8087 | `search_db` |
-| `ingest-service.yml` | 8088 | `raw_db` |
-| `extract-service.yml` | 8089 | 없음 |
-| `congestion-service.yml` | 8090 | 없음 |
-| `route-service.yml` | 8091 | 없음 |
-| `report-service.yml` | 8092 | `report_db` |
-| `review-service.yml` | 8094 | `review_db` |
-| `notification-service.yml` | 8093 | `notif_db` |
+| `uri` | `lb://` + 그 서비스의 `spring.application.name` | **503** |
+| `predicates` | 보낼 경로 | 안 적으면 **404** |
+| 관리자 경로 | `/api/v1/admin/{리소스}/**` 로 따로 | — |
 
-`service-template` 저장소를 그대로 실행할 때 쓰는 `template-service.yml` 도 함께 둡니다. 배포 대상은 아니지만 공통 모듈이나 설정 서버를 확인할 때 실제로 띄우므로, 그때마다 임시 값을 넣었다 되돌리지 않아도 되게 파일로 두었습니다. 포트는 8095이며 데이터베이스는 `raw_db` 를 빌려 씁니다.
+> **`/api/v1/places/` 아래에는 `/**` 를 쓰지 않습니다.** 서비스 6개가 섞여 있어
+> 첫 라우트가 전부 먹습니다. `gateway-server` README 3-2 참고.
+>
+> **YAML 은 들여쓰기가 곧 구조입니다.** `- id:` 앞 공백이 한 칸이라도 다르면
+> **오류 없이 무시됩니다.** 위 항목을 복사해 값만 바꾸는 편이 안전합니다.
+
+<br><br>
 
 ---
 
-## 7. 값을 바꾸면 언제 반영되는가
+### 5-3. ④ 인증 예외
+
+```yaml
+# gateway-server.yml
+app:
+  gateway:
+    permit-all:
+      - /api/v1/auth/signup
+      # ... 9줄
+```
+
+**auth 는 자기 목록도 갖고 있습니다.**
+
+```
+gateway-server.yml   app.gateway.permit-all    게이트웨이가 토큰 없이 통과시킴
+auth-service.yml     app.auth.permit-all       auth 보안 체인이 열어 둠
+```
+
+**같은 9줄이 양쪽에 있어야 합니다.** 한쪽에만 빠지면 401 이 납니다.
+
+> **auth 만 그렇습니다.** auth 가 자기 `SecurityFilterChain` 을 정의해
+> 공통 모듈의 규칙이 물러나기 때문입니다. 다른 서비스는 게이트웨이 쪽만 적으면 됩니다.
+
+<br><br>
+
+---
+
+## 6. 값이 언제 반영되나
+
+```
+① config 저장소에 push
+        │
+        │  설정 서버는 요청이 올 때마다 GitHub 을 읽음
+        │  ★재시작이 필요 없음
+        ▼
+② 이미 떠 있는 서비스에 반영 — 둘 중 하나
+        │
+        ├──▶  POST /actuator/refresh        재시작 없이
+        └──▶  서비스 재기동
+        │
+        ▼
+③ 확인   curl :8888/<서비스명>/local
+```
+
+<br><br>
+
+---
+
+### 6-1. 무엇이 refresh 로 되고 무엇이 안 되나
 
 | 바꾼 것 | 필요한 작업 |
 |---|---|
-| 이 저장소의 값 | `main` 에 커밋하면 끝입니다. `config-server` 를 다시 띄우지 않아도 됩니다 |
-| 이미 떠 있는 서비스에 반영 | 해당 서비스에 `POST /actuator/refresh` 또는 재기동 |
-| `config-server` 자신의 설정 | 컨테이너 재시작 (이미지는 그대로) |
-
-`config-server` 는 요청을 받을 때마다 저장소를 다시 읽습니다. 따라서 설정 변경이 곧 배포는 아닙니다. 값을 고쳐 push 한 뒤 설정 서버를 그대로 둔 채 서비스만 다시 띄워도 새 값이 내려오는 것을 확인했습니다.
-
----
-
-## 8. 트러블슈팅
-
-### 값을 바꿨는데 서비스에 반영되지 않습니다
-
-커밋했는지 먼저 확인합니다. `config-server` 는 작업 디렉터리가 아니라 저장소를 읽으므로 커밋하지 않은 변경은 보이지 않습니다.
-
-커밋했다면 서비스가 설정을 다시 읽지 않은 것입니다. `POST /actuator/refresh` 를 호출하거나 재기동합니다.
-
-`config-server` 에서 실제로 내려가는 값은 아래로 확인합니다.
+| config 저장소의 값 | **push 하면 끝.** 설정 서버는 그대로 |
+| 이미 떠 있는 서비스 | `POST /actuator/refresh` 또는 재기동 |
+| 서비스 저장소의 `application.yml` | **재배포** |
+| 환경변수 | **컨테이너 재시작** |
+| 액추에이터 엔드포인트 등록 | **재기동** — 등록은 기동 시점에 일어남 |
 
 ```bash
-curl http://localhost:8888/auth-service/dev
+curl -X POST http://localhost:8084/actuator/refresh
 ```
 
-### 설정을 `.yml` 주소로 열면 400 이 납니다
+**바뀐 키 목록이 배열로 돌아옵니다.**
 
-`http://localhost:8888/auth-service-dev.yml` 형태는 **우리 프로젝트에서 쓸 수 없습니다.** 설정 서버가 이 주소에서 서비스명과 프로파일을 하이픈으로 가르는데, 우리 서비스명은 모두 `auth-service` 처럼 하이픈을 포함하고 있어 어디까지가 이름인지 판단하지 못합니다. `.properties` 와 `.json` 주소도 같습니다.
-
-**슬래시 주소를 씁니다.**
-
-```
-http://localhost:8888/auth-service/dev
+```json
+["app.datasource.host", "server.port"]
 ```
 
-이쪽이 검증에도 낫습니다. 응답의 `propertySources` 배열이 **어느 계층 파일에서 온 값인지까지 보여 주며, 배열 앞이 우선순위가 높은 쪽**입니다.
+> **빈 배열이면 아무것도 안 바뀐 것입니다.** push 를 안 했거나 값이 같습니다.
 
-서비스가 설정을 받아 가는 경로도 원래 이 주소이므로 실사용에는 영향이 없습니다. 다만 **프로파일 이름에는 하이픈을 쓰면 안 됩니다.** 프로파일에 하이픈이 있으면 슬래시 주소마저 동작하지 않습니다.
-
-### 라우팅 규칙을 고쳤는데 특정 경로가 404 입니다
-
-**내가 적은 것과 게이트웨이가 실제로 물고 있는 것을 대조합니다.** 규칙이 이 저장소에 있으므로 두 곳을 각각 확인해야 합니다.
-
-```powershell
-curl.exe http://localhost:8888/gateway-server/local        내가 적은 것
-curl.exe http://localhost:8080/actuator/gateway/routes     실제로 도는 것
-```
-
-앞쪽에 있는데 뒤쪽에 없다면 게이트웨이가 설정을 다시 읽지 않은 것입니다. `POST /actuator/refresh` 를 호출하거나 재기동합니다.
-
-양쪽에 다 있는데도 404라면 경로 패턴을 봅니다. `/api/v1/places/` 아래는 여러 서비스가 나누어 쓰므로 `/**` 대신 `{placeId}` 처럼 마디를 정확히 지정해 두었습니다. 그래서 **하위 경로가 새로 생기면 규칙도 함께 추가해야 합니다.**
-
-뒤쪽 목록이 통째로 비어 있다면 게이트웨이가 설정을 받지 못한 것입니다. 이 서비스는 원래 포트가 8080이라 설정을 못 받아도 같은 포트에 뜨므로 **포트로는 판별되지 않습니다.**
-
-### `{서비스명}.yml` 을 만들었는데 읽히지 않습니다
-
-파일명이 그 서비스의 `spring.application.name` 과 정확히 같은지 확인합니다. 다르면 오류 없이 무시되고 그 계층만 빠진 채 내려갑니다.
-
-### 서비스가 기동할 때 설정을 받지 못합니다
-
-`spring.config.import` 에 `optional:` 이 붙어 있는지 확인합니다. 없으면 `config-server` 가 떠 있지 않을 때 기동 자체가 실패합니다.
-
-### 비밀 값을 실수로 커밋했습니다
-
-되돌리는 것만으로는 부족합니다. 이력에 남아 있으므로 **해당 키나 비밀번호를 새로 발급해야 합니다.** 발급 후 환경변수를 교체하고, 이 저장소에는 `${환경변수}` 형태만 남았는지 다시 확인합니다.
+<br><br>
 
 ---
 
-## 9. 작업 규칙
+### 6-2. refresh 가 DataSource 까지 다시 만듭니다
 
-1. 브랜치를 나누지 않고 `main` 에 직접 커밋합니다.
-2. **메모장으로 편집하지 않습니다.** IntelliJ 또는 VS Code를 사용합니다. 줄바꿈이나 인코딩이 깨지면 값이 조용히 어긋나며 오류 메시지가 나오지 않습니다.
-3. 값을 옮길 때는 **원래 있던 곳에서 지웁니다.** 같은 값이 서비스 저장소와 이 저장소에 모두 있으면 어느 쪽이 이기는지 매번 확인해야 합니다.
-4. 값을 추가하면 4장의 기준으로 계층을 고릅니다.
+```yaml
+# 1계층 — application.yml
+spring:
+  cloud:
+    refresh:
+      extra-refreshable: javax.sql.DataSource,com.zaxxer.hikari.HikariDataSource
+      never-refreshable: ""
+```
+
+```
+이 두 줄이 없으면
+        │
+        ├──▶  프로퍼티만 다시 바인딩됨
+        └──▶  ⛔ 커넥션 풀은 옛 주소를 그대로 물고 있음
+                  refresh 응답이 정상이고 바뀐 키가 나와도 그러함
+```
+
+**DB 를 옮겼을 때 주소만 바꾸고 재배포 없이 전환하기 위한 것입니다.**
+**지우지 않습니다.**
+
+> `app.datasource.host` 한 줄을 3계층에서 고치고 refresh 하면
+> **14개 서비스가 새 DB 를 봅니다.**
+
+<br><br>
 
 ---
 
-## 10. 디렉터리 구조
+### 6-3. 포트로는 판별이 안 되는 서비스가 있습니다
+
+| 서비스 | 설정 미수신 판별 |
+|---|---|
+| 도메인 서비스 | 포트가 **8080** 으로 뜸 (정상 포트가 8081~8095) |
+| eureka-server | 포트가 **8080** 으로 뜸 (정상 8761) |
+| **gateway-server** | ⛔ **정상 포트가 8080 이라 판별 불가** |
+
+**게이트웨이는 `/actuator/gateway/routes` 가 비어 있는 것으로 가려냅니다.**
+
+```bash
+curl http://localhost:8080/actuator/gateway/routes
+```
+
+<br><br>
+
+---
+
+## 7. 막히기 쉬운 자리
+
+<br><br>
+
+---
+
+### 7-1. 값이 안 내려올 때
+
+| 증상 | 원인 |
+|---|---|
+| 포트가 8080 으로 뜸 | **2계층 파일을 못 찾음.** 파일명이 `spring.application.name` 과 같은지 |
+| `propertySources` 가 비어 있음 | 같음 |
+| `${DB_HOST}` 가 그대로 들어감 | **환경변수를 안 넣음.** `UnknownHostException: ${DB_HOST}` |
+| `:8888/서비스명-local.yml` 이 400 | **확장자 주소는 못 씀.** `/서비스명/local` 로 |
+| 고쳤는데 그대로 | push 를 안 했거나 refresh 를 안 함 |
+| 게이트웨이 라우트가 0개 | config 미수신 |
+
+**대조하는 것이 요령입니다.**
 
 ```
-config/
-├── application.yml               1계층. 모든 서비스 공통
-│
-├── eureka-server.yml             2계층. 플랫폼
-├── gateway-server.yml            2계층. 라우팅 규칙 · 인증 예외 · 공개키
-├── auth-service.yml              2계층. 도메인 서비스 14개
-├── ...
-├── template-service.yml          2계층. service-template 실행용
-│
-├── application-local.yml         3계층. IntelliJ 실행
-├── application-dev.yml           3계층. 로컬 컨테이너
-├── application-prod.yml          3계층. AWS
-│
-├── eureka-server-local.yml       4계층. 자기 주소 인식 (2-3 참고)
-├── eureka-server-dev.yml         4계층
-│
-├── .gitattributes
-├── .editorconfig
-├── .gitignore
-├── .coderabbit.yaml
-└── .github/
-    ├── ISSUE_TEMPLATE/issue_template.md
-    └── pull_request_template.md
+:8888/place-service/local              내가 쓴 것
+:8084/actuator/env                     서비스가 실제로 들고 있는 것
 ```
+
+<br><br>
+
+---
+
+### 7-2. YAML 을 고칠 때
+
+| 하려는 것 | 주의 |
+|---|---|
+| 최상위 키를 추가 | **같은 키가 두 번 나오면 앞의 블록이 통째로 무시됨** |
+| 라우트 추가 | `- id:` 앞 공백이 한 칸만 달라도 무시됨 |
+| 공개키 붙여넣기 | 블록 스칼라 안의 들여쓰기가 일정해야 함 |
+| `prod` 의 TODO 주석 풀기 | **`app` · `spring` 등이 두 번 나오지 않게 하나의 트리로** |
+
+```yaml
+# ⛔ 이렇게 되면 앞의 app 블록이 통째로 무시됨
+app:
+  auth:
+    cookie:
+      secure: false
+
+app:                    # ← 두 번째 app
+  datasource:
+    host: 10.0.0.0
+```
+
+---
+
+**검사하는 법**
+
+```bash
+python3 -c "import yaml; yaml.safe_load(open('place-service.yml', encoding='utf-8')); print('OK')"
+```
+
+**설정 서버로도 확인됩니다.**
+
+```bash
+curl http://localhost:8888/place-service/local
+```
+
+**500 이 나오면 YAML 이 깨진 것입니다.**
+
+<br><br>
+
+---
+
+### 7-3. 새 값에 검증을 붙일 때
+
+**서비스의 `Properties` 클래스에 *"비면 기동을 막는"* 검증을 추가하면
+세 곳을 함께 고쳐야 합니다.**
+
+```
+config/<서비스명>.yml                              실제 값
+<서비스>/src/test/resources/application.yml        테스트용 사본   ← 놓치기 쉬움
+<서비스>의 Properties 클래스                        검증
+```
+
+```
+테스트는 spring.cloud.config.enabled: false 라
+config 저장소 값이 하나도 안 내려옴
+        │
+        └── config 에만 넣고 테스트 리소스를 안 고치면
+              contextLoads 가 실패해 빌드가 깨짐
+```
+
+> **실제로 겪었습니다.** `app.jwt.claim.type` 을 넣을 때 auth·게이트웨이 양쪽에서
+> 테스트 리소스를 빠뜨렸습니다.
+
+<br><br>
+
+---
+
+### 7-4. 순서가 중요한 경우
+
+**서비스에 새 검증이 들어갈 때는 config 를 먼저 올립니다.**
+
+```
+① config 저장소에 새 값 push
+        │
+        ▼
+② docker compose restart config-server      (컨테이너로 돌 때)
+        │
+        ▼
+③ 서비스 배포
+```
+
+**①을 안 하고 ③을 하면 새 검증에 걸려 기동이 막힙니다.** 의도한 동작입니다.
+
+<br><br>
+
+---
+
+## 8. 왜 이렇게 만들었나
+
+<br><br>
+
+---
+
+### 8-1. 왜 저장소를 따로 두나
+
+| 고름 | 버림 |
+|---|---|
+| config 저장소 + 설정 서버 | 각 서비스의 `application.yml` |
+| **값을 바꾸면 push 로 끝** | 빌드 → 이미지 → 배포 한 사이클 |
+| 값이 한 곳에 모임 | 저장소 17곳에 흩어짐 |
+| 환경별 차이가 파일로 갈림 | 코드에 분기 |
+
+**결정적인 자리가 둘입니다.**
+
+```
+DB 승격        3계층의 app.datasource.host 한 줄 + refresh
+                재배포 없이 14개 서비스가 새 DB 를 봄
+
+라우트 개방     앞으로 14번 일어남
+                게이트웨이 코드에 있으면 그때마다 blue-green 배포
+```
+
+<br><br>
+
+---
+
+### 8-2. 왜 공개 저장소인가
+
+```
+전제 — 설정 서버는 ${...} 를 치환하지 않고 문자열 그대로 내려보냄
+        │
+        └── 비밀값이 애초에 이 저장소에 존재하지 않음
+              각 서비스가 자기 환경변수로 해석함
+```
+
+**공개로 두면 얻는 것입니다.**
+
+| | |
+|---|---|
+| 설정 서버가 인증 없이 읽음 | private 이면 토큰을 설정 서버에 넣어야 함 |
+| 팀원이 바로 봄 | 권한 관리가 없음 |
+| 심사에서 그대로 보여줄 수 있음 | |
+
+> ⚠ **대신 실수의 대가가 큽니다.** 한 번 커밋하면 지워도 이력에 남고
+> **키를 새로 발급해야 합니다.**
+
+<br><br>
+
+---
+
+### 8-3. 왜 라우팅을 여기 두나
+
+**게이트웨이 코드가 아니라 config 2계층에 있습니다.**
+
+```
+라우트 개방이 앞으로 14번 일어남
+        │
+        ├── 코드에 있으면   빌드 → 이미지 push → blue-green 배포
+        └── config 에 있으면  push + /actuator/refresh
+```
+
+| | config yml | 자바 `RouteLocator` |
+|---|---|---|
+| 오타 검증 | 없음 | 컴파일 |
+| 오타 증상 | **404 — 첫 호출에서 드러남** | — |
+| 환경별 차이 | 4계층으로 | 코드 분기 |
+
+> **대가는 영향 범위입니다.** 지금 config 오타는 *"그 서비스 하나"* 가 포트를
+> 못 잡는 정도인데, 라우트가 들어오면 **오타 하나로 특정 API 전체가 404** 가 됩니다.
+
+<br><br>
+
+---
+
+### 8-4. 왜 `config-server.yml` 이 없나
+
+```
+config-server 만 닭-달걀 문제가 있음
+        │
+        └── 저장소 주소를 알아야 저장소를 읽을 수 있음
+              그 값을 저장소에서 받을 수 없음
+```
+
+**그래서 설정 서버는 자기 저장소 안에 설정을 둡니다.**
+
+**예외를 그것 하나로 줄인 것이 이득입니다.** 게이트웨이·유레카는 그 문제가 없어
+여기서 받습니다.
+
+> **컨테이너로 띄울 때 config-server 만 주소 환경변수를 직접 받습니다.**
+> `EUREKA_HOST` · `LOKI_HOST` 인데, **dev 프로파일이 주소를 바꿔 주는 경로가
+> 없기 때문**입니다.
+>
+> 빠뜨리면 `localhost` 로 남는데 **컨테이너 안에서 그것은 자기 자신이라
+> 유레카 등록이 영영 실패**하고, 등록 실패가 기동을 막지 않아
+> **유레카 화면에 안 보이는 것으로 알아차리게 됩니다.**
+
+<br><br>
+
+---
+
+### 8-5. 왜 `main` 에 직접 커밋하나
+
+```
+이 저장소에는
+        코드가 없음         빌드도 CI 도 없음
+        리뷰할 것이 없음     YAML 22개
+        설정 서버가 main 을 읽음
+```
+
+**이슈·PR·브랜치를 만들면 얻는 것 없이 단계만 늘어납니다.**
+
+> **도메인 서비스는 다릅니다.** 거기는 1이슈-1브랜치-1PR 이고 CodeRabbit 리뷰가 붙습니다.
+
+<br><br>
+
+---
+
+## 9. 아직 안 한 것
+
+<br><br>
+
+---
+
+### 9-1. `prod` 가 거의 비어 있습니다
+
+```yaml
+# application-prod.yml — 지금 살아 있는 것은 이것뿐
+logging:
+  level:
+    com.pawtrail: INFO
+```
+
+**나머지는 주석 처리된 TODO 입니다.**
+
+| 채울 것 | 언제 |
+|---|---|
+| `app.datasource.host` | **AWS 노드 구성이 정해지면** — data-primary 사설 IP |
+| `app.logging.loki.url` | 관측 노드 사설 IP |
+| `spring.data.redis.host` | Redis 가 뜨는 노드 |
+| `spring.kafka.bootstrap-servers` | Kafka 노드 |
+| `eureka.client.service-url` | edge 노드 |
+| `management.tracing...zipkin` | 관측 노드 |
+| `app.auth.cookie.secure: true` | **nginx 에 인증서를 붙일 때** |
+| `app.oauth.*` | **도메인이 생길 때** — 구글은 IP 와 HTTP 를 거부 |
+
+> ⚠ **채우기 전에 `prod` 프로파일로 띄우지 않습니다.**
+> 값이 없으면 **1계층 값이 그대로 내려가 local 주소로 붙으려 시도하며
+> 오류 없이 이상하게 동작합니다.**
+
+---
+
+**주석을 풀 때 주의합니다.**
+
+```
+최상위 키(app · spring · eureka · management)가 두 번 나오지 않게 할 것
+        │
+        └── YAML 중복 키가 되면 앞의 블록이 통째로 무시됨
+              지금은 하나의 트리로 이어 두었으므로 블록째 주석만 풀면 됨
+```
+
+<br><br>
+
+---
+
+### 9-2. 시점이 정해진 것
+
+| 언제 | 무엇 |
+|---|---|
+| **EC2 를 세울 때** | `prod` 주소 전부 · `application-dev.yml` 의 DB 주석 재검토 |
+| **nginx 를 붙일 때** | `cookie.secure: true` · OAuth 배포 주소 |
+| **AWS 배포 때** | **RS256 키 페어를 새로 만들고 `gateway-server-prod.yml` 에 공개키** |
+| user·pet 착수 시 | 각 서비스 파일에 `outbox.relay.enabled` 확인 |
+
+> ⚠ **키 페어를 바꿀 때 짝이 어긋나면 전 요청이 401 입니다.**
+> 개인키(auth 환경변수)와 공개키(여기)를 **함께** 바꿔야 합니다.
+
+<br><br>
+
+---
+
+### 9-3. 판단만 남은 것
+
+| 무엇 | 상태 |
+|---|---|
+| 4계층을 더 쓸지 | 지금 유레카 둘뿐. **되도록 비워 두는 것이 방침** |
+| `prod` 를 어떻게 검증할지 | EC2 가 서기 전에는 확인할 방법이 없음 |
+| 조직 전용 BOM | Boot 버전이 21개 레포에 사본으로 있음 |
+
+<br><br>
+
+---
+
+## 10. 용어
+
+공통 용어는 `service-template` README 11장에 있습니다.
+**여기는 설정에서만 쓰는 말**입니다.
+
+| 용어 | 뜻 |
+|---|---|
+| **설정 서버** | 이 저장소를 읽어 각 서비스에 설정을 내려 주는 서버. `config-server` 저장소 |
+| **계층** | 설정 파일의 우선순위 단계. 1~4이고 **숫자가 큰 쪽이 이김** |
+| **프로파일** | 환경 이름. `local` · `dev` · `prod` |
+| **`propertySources`** | 설정 서버 응답에서 **어느 파일에서 온 값인지** 보여 주는 배열. 앞이 우선순위가 높음 |
+| **`${...}`** | 플레이스홀더. 설정 서버는 치환하지 않고 **문자열 그대로 내려보냄** |
+| **블록 스칼라 (`\|`)** | 여러 줄 문자열을 그대로 담는 YAML 문법. 공개키가 이 형태 |
+| **`/actuator/refresh`** | 서비스가 설정을 다시 읽는 엔드포인트. `POST` |
+| **`extra-refreshable`** | refresh 할 때 **다시 만들 빈**을 지정. DataSource 가 여기 있음 |
+| **닭-달걀 문제** | 설정 서버가 자기 설정을 저장소에서 못 받는 것. **저장소 주소를 알아야 저장소를 읽음** |
+| **`lb://`** | 게이트웨이 라우트에서 *"유레카에서 이 이름으로 찾아라"* 는 표시 |
+| **`permit-all`** | 인증 없이 통과시킬 경로 목록. 게이트웨이와 auth 양쪽에 같은 9줄 |
+| **`out-of-order`** | Flyway 가 **번호 순서를 건너뛴 스크립트도 실행**하게 하는 옵션. 공통 대역 때문에 켜 둠 |
