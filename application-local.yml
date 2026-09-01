@@ -14,9 +14,14 @@ app:
       # 개발 중 요청을 직접 보낼 때 막힘
       secure: false
   datasource:
-    # 팀 공용 EC2 의 PostgreSQL 주소임
-    # 공인 IP 이고 5432 가 열려 있어 이 저장소에 값을 적지 않음
-    # 각자 .env 또는 IntelliJ 실행 구성에 DB_HOST 를 넣음
+    # 지금은 각자 로컬에 띄운 postgres 를 봄 (infra 의 db 프로파일)
+    # IntelliJ 는 도커 밖에서 도므로 값이 localhost 임
+    #
+    # 기본값을 박지 않는 이유
+    #   EC2 로 옮길 때 환경변수를 안 넣은 사람이 조용히 로컬 DB 에 붙게 됨
+    #   값이 없으면 기동이 실패해 누락이 바로 드러남
+    #
+    # 각자 IntelliJ 실행 구성에 DB_HOST 를 넣음
     host: ${DB_HOST}
   logging:
     loki:
