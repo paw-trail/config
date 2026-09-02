@@ -36,7 +36,7 @@
 
 | | 값 | 어디에 |
 |---|---|---|
-| yml 파일 | **22개** | [1장](#1-파일-지도) |
+| yml 파일 | **23개** | [1장](#1-파일-지도) |
 | 계층 | 4개 | [2장](#2-4계층--숫자가-큰-쪽이-이김) |
 | 서비스 파일 | 17개 | 도메인 14 + 플랫폼 2 + 템플릿 1 |
 | 환경 | 3개 | `local` · `dev` · `prod` |
@@ -48,7 +48,7 @@
 **이 저장소만의 특징 셋입니다.**
 
 ```
-1  코드가 없음                 yml 22개와 README 뿐
+1  코드가 없음                 yml 23개와 README 뿐
                               빌드도 CI 도 없음
 
 2  main 에 직접 커밋            이슈·PR·브랜치를 만들지 않음
@@ -57,6 +57,72 @@
 3  공개 저장소                  ⚠ 비밀값을 절대 적지 않음
                               한 번 커밋하면 지워도 이력에 남음
 ```
+
+<br><br>
+
+---
+
+### 먼저 알아 두면 좋은 것 4가지
+
+---
+
+**① 설정이란 — 코드에서 뺀 "값"**
+
+```
+코드에 박으면                            설정으로 빼면
+
+  url = "jdbc:postgresql://localhost"     url = ${DB 주소}
+        │                                       │
+        └── DB 를 옮기면 코드를 고치고            └── 값만 바꾸면 됨
+            빌드하고 다시 배포                     코드는 그대로
+```
+
+**포트 · DB 주소 · 만료 시간 · 라우트 같은 것들이 전부 설정입니다.**
+이 저장소는 그 값들을 모아 둔 곳이고, **코드는 한 줄도 없습니다.**
+
+---
+
+**② 프로파일이란 — "지금 어디서 돌고 있나"**
+
+같은 서비스라도 **어디서 도느냐에 따라 값이 다릅니다.** 그것을 이름 하나로 가릅니다.
+
+| 프로파일 | 어디서 | DB 주소 | Kafka 주소 |
+|---|---|---|---|
+| `local` | IntelliJ (내 컴퓨터) | `localhost` | `localhost:29092` |
+| `dev` | 로컬 도커 컨테이너 | `postgres` | `kafka:9092` |
+| `prod` | AWS EC2 | (아직) | (아직) |
+
+**서비스를 띄울 때 프로파일을 하나 고르면** 그 이름이 붙은 파일이 함께 적용됩니다.
+
+---
+
+**③ `${...}` — 값이 아니라 자리**
+
+```yaml
+password: ${SERVICE_DB_PASSWORD}
+          ▲
+          └── "이 값은 여기 안 적음. 환경변수 SERVICE_DB_PASSWORD 에서 가져와라"
+```
+
+**비밀번호·키를 저장소에 적지 않기 위한 장치입니다.** 서비스가 뜰 때 자기 환경변수를
+보고 채웁니다. **환경변수가 없으면 `${SERVICE_DB_PASSWORD}` 라는 문자열이 그대로 들어가
+접속에 실패합니다** — 그것이 "빠뜨렸다" 는 신호입니다.
+
+---
+
+**④ YAML — 들여쓰기가 곧 구조**
+
+```yaml
+server:                    #  server
+  port: 8084               #    └── port = 8084
+
+spring:                    #  spring
+  datasource:              #    └── datasource
+    url: jdbc:...          #          └── url = jdbc:...
+```
+
+**공백 두 칸이 한 단계입니다.** 한 칸이라도 어긋나면 **오류 없이 다른 위치로 읽히거나
+무시됩니다.** 기존 항목을 복사해 값만 바꾸는 편이 안전합니다.
 
 <br><br>
 
@@ -95,13 +161,13 @@ paw-trail/config
 ├── application-prod.yml          3계층   AWS EC2                       81줄 (거의 TODO)
 │
 ├── 플랫폼 (2개)
-│   ├── gateway-server.yml        2계층   ★라우트 19 · 공개키 · 인증예외  293줄
+│   ├── gateway-server.yml        2계층   *라우트 19 · 공개키 · 인증예외  293줄
 │   ├── eureka-server.yml         2계층                                  44줄
-│   ├── eureka-server-local.yml   4계층   ★실사례                        25줄
-│   └── eureka-server-dev.yml     4계층   ★실사례                        15줄
+│   ├── eureka-server-local.yml   4계층   *실사례                        25줄
+│   └── eureka-server-dev.yml     4계층   *실사례                        15줄
 │
 ├── 도메인 서비스 (14개)
-│   ├── auth-service.yml          2계층   ★제일 큼 — JWT · 메일 · OAuth  238줄
+│   ├── auth-service.yml          2계층   *제일 큼 — JWT · 메일 · OAuth  238줄
 │   ├── user-service.yml                  17줄
 │   ├── pet-service.yml                   23줄
 │   ├── place-service.yml                 23줄
@@ -363,7 +429,7 @@ eureka:
 local   IntelliJ 가 호스트에서 돎
           │
           └──▶  host.docker.internal 로 등록
-                  ★컨테이너 안의 게이트웨이가 이 이름으로 호스트를 찾음
+                  *컨테이너 안의 게이트웨이가 이 이름으로 호스트를 찾음
                     한 이름이 호스트·컨테이너 양쪽에서 통함
 
 dev     컨테이너 안에서 돎
@@ -440,20 +506,20 @@ curl.exe http://localhost:8888/place-service/local
 ```
 새 값을 넣을 때
 
-        서비스마다 다른가?
-              │
-        ┌─────┴─────┐
-       예           아니오
-        │             │
-        ▼             ▼
-  환경마다 다른가?   환경마다 다른가?
-        │                 │
-   ┌────┴────┐       ┌────┴────┐
-  예        아니오    예        아니오
-   │          │       │          │
-   ▼          ▼       ▼          ▼
- 4계층      2계층    3계층      1계층
-{svc}-{env}  {svc}   app-{env}   app
+              서비스마다 다른가?
+                      │
+          ┌───────────┴───────────┐
+         예                    아니오
+          │                       │
+          ▼                       ▼
+  환경마다 다른가?        환경마다 다른가?
+          │                       │
+    ┌─────┴─────┐           ┌─────┴─────┐
+   예        아니오        예        아니오
+    │           │           │           │
+    ▼           ▼           ▼           ▼
+  4계층       2계층       3계층       1계층
+{svc}-{env}   {svc}     app-{env}      app
 
 
   애매하면 번호가 작은 쪽에 둘 것
@@ -709,11 +775,30 @@ server:
 
 | 값 | 규칙 |
 |---|---|
-| `server.port` | `service-template` README 4-5 의 배정표 |
+| `server.port` | 아래 배정표 |
 | `username` | **`<서비스>_svc`** — `_user` 가 아닙니다 |
 | `url` 의 DB 이름 | `<서비스>_db` (`ingest` 만 `raw_db`) |
-| `outbox.relay.enabled` | 이벤트를 발행하는 서비스만 `true` |
+| `outbox.relay.enabled` | 이벤트를 **발행하는** 서비스만 `true` — auth · place · policy · pet · report |
 | `auditor.system-name` | **배치만** — `ingest-batch` · `extract-batch` |
+
+---
+
+**포트 배정표입니다.** 이 저장소의 `<서비스명>.yml` 이 포트의 단일 출처입니다.
+
+```
+플랫폼                      도메인
+  8080  gateway-server        8081  auth        8088  ingest
+  8761  eureka-server         8082  user        8089  extract
+  8888  config-server         8083  pet         8090  congestion
+                              8084  place       8091  route
+                              8085  policy      8092  report
+                              8086  verdict     8093  notification
+                              8087  search      8094  review
+                                                8095  template (검증용)
+```
+
+> **`docker-compose.yml` 의 포트 매핑과 Prometheus 타깃도 같은 번호를 씁니다.**
+> 여기서 바꾸면 그 둘도 함께 봐야 합니다.
 
 > **주석을 다는 형태를 지킵니다.** 파일 첫머리에 계층 · 서비스명 · 담당 · 값의
 > 출처를 적습니다. 나중에 보는 사람이 **"이 값이 어디서 오나" 를 파일 안에서
@@ -792,7 +877,7 @@ auth-service.yml     app.auth.permit-all       auth 보안 체인이 열어 둠
 ① config 저장소에 push
         │
         │  설정 서버는 요청이 올 때마다 GitHub 을 읽음
-        │  ★재시작이 필요 없음
+        │  *재시작이 필요 없음
         ▼
 ② 이미 떠 있는 서비스에 반영 — 둘 중 하나
         │
@@ -1103,7 +1188,7 @@ config-server 만 닭-달걀 문제가 있음
 ```
 이 저장소에는
         코드가 없음         빌드도 CI 도 없음
-        리뷰할 것이 없음     YAML 22개
+        리뷰할 것이 없음     YAML 23개
         설정 서버가 main 을 읽음
 ```
 
