@@ -15,3 +15,32 @@ spring:
   datasource:
     url: jdbc:postgresql://${app.datasource.host}:5432/user_db
     username: user_svc
+
+# -----------------------------------------------------------------------------
+# 객체 저장소
+# -----------------------------------------------------------------------------
+# 프로필 사진을 S3 에 둠
+#
+# 키는 users/{accountId}/profile 로 계정당 하나임
+# 새 사진이 덮어써지므로 옛 파일을 지우는 코드가 필요 없고,
+# 그래서 남의 파일을 지울 수 있는 경로도 생기지 않음
+#
+# 액세스 키는 여기 두지 않음
+# DefaultCredentialsProvider 가 환경변수에서 읽음
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+# 각자 실행 구성에 넣으며, RS256 개인키나 메일 앱 비밀번호와 같은 취급임
+# -----------------------------------------------------------------------------
+
+app:
+  storage:
+    bucket: pawtrail-media
+    region: ap-northeast-2
+
+    # 서명 유효 시간(초)
+    #
+    # 업로드는 발급받고 바로 올리므로 짧아도 됨
+    # 조회는 화면을 열어 둔 채로 있어도 안 깨질 만큼 둠
+    # 액세스 토큰이 30분이라 그쯤이면 어차피 화면을 새로 그림
+    upload-expires-seconds: 600
+    download-expires-seconds: 3600
