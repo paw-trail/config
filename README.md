@@ -178,7 +178,7 @@ spring:                    #  spring
 ```
 paw-trail/config
 │
-├── application.yml               1계층   모든 서비스 · 모든 환경        178줄
+├── application.yml               1계층   모든 서비스 · 모든 환경        197줄
 │
 ├── application-local.yml         3계층   IntelliJ 로 띄울 때            75줄
 ├── application-dev.yml           3계층   로컬 컨테이너                  62줄
@@ -192,7 +192,7 @@ paw-trail/config
 │
 ├── 도메인 서비스 (14개)
 │   ├── auth-service.yml          2계층   *제일 큼 — JWT · 메일 · OAuth  238줄
-│   ├── user-service.yml                  17줄
+│   ├── user-service.yml                  62줄   S3 · 이미지 상한
 │   ├── pet-service.yml                   23줄
 │   ├── place-service.yml                 23줄
 │   ├── policy-service.yml                23줄
@@ -378,7 +378,7 @@ eureka:
 
 ### 2-2. 각 계층에 무엇이 있나
 
-**1계층 — `application.yml` (178줄)**
+**1계층 — `application.yml` (197줄)**
 
 | 블록 | 무엇 |
 |---|---|
@@ -390,6 +390,7 @@ eureka:
 | `management` | 액추에이터 노출 · 추적 샘플링 1.0 |
 | `app.auditor.system-name` | `SYSTEM` |
 | `app.outbox.relay.enabled` | **`false`** — 발행하는 서비스만 2계층에서 켬 |
+| `app.rest-client` | `connect-timeout 2s` · `read-timeout 5s` — 서비스 간 호출 |
 
 ---
 
