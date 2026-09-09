@@ -192,7 +192,7 @@ paw-trail/config
 │
 ├── 도메인 서비스 (14개)
 │   ├── auth-service.yml          2계층   *제일 큼 — JWT · 메일 · OAuth  238줄
-│   ├── user-service.yml                  62줄   S3 · 이미지 상한
+│   ├── user-service.yml                 134줄   S3 · 이미지 상한 · LLM
 │   ├── pet-service.yml                   23줄
 │   ├── place-service.yml                 23줄
 │   ├── policy-service.yml                23줄
@@ -203,8 +203,8 @@ paw-trail/config
 │   ├── verdict-service.yml               12줄   DB 없음 — 포트만
 │   ├── congestion-service.yml            12줄   DB 없음
 │   ├── route-service.yml                 12줄   DB 없음
-│   ├── ingest-service.yml                23줄   배치 — auditor 를 덮음
-│   └── extract-service.yml               30줄   배치
+│   ├── ingest-service.yml               161줄   *배치 — 소스 3종 · 허용량 · 표본
+│   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
 └── template-service.yml          2계층   service-template 을 그대로 띄울 때
 ```
@@ -1279,7 +1279,8 @@ logging:
 | **EC2 를 세울 때** | `prod` 주소 전부 · `application-dev.yml` 의 DB 주석 재검토 |
 | **nginx 를 붙일 때** | `cookie.secure: true` · OAuth 배포 주소 |
 | **AWS 배포 때** | **RS256 키 페어를 새로 만들고 `gateway-server-prod.yml` 에 공개키** |
-| user·pet 착수 시 | 각 서비스 파일에 `outbox.relay.enabled` 확인 |
+| pet 착수 시 | 각 서비스 파일에 `outbox.relay.enabled` 확인 |
+| **extract 착수 시** | `extract-service.yml` 이 포트와 감사 이름뿐 — LLM·청크 값이 들어갈 자리 |
 
 > ⚠ **키 페어를 바꿀 때 짝이 어긋나면 전 요청이 401 입니다.**
 > 개인키(auth 환경변수)와 공개키(여기)를 **함께** 바꿔야 합니다.
