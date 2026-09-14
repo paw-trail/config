@@ -193,8 +193,8 @@ paw-trail/config
 ├── 도메인 서비스 (14개)
 │   ├── auth-service.yml          2계층   *제일 큼 — JWT · 메일 · OAuth  238줄
 │   ├── user-service.yml                 134줄   S3 · 이미지 상한 · LLM
-│   ├── pet-service.yml                   23줄
-│   ├── place-service.yml                 23줄
+│   ├── pet-service.yml                   52줄   S3 · 이미지 상한 · outbox relay
+│   ├── place-service.yml                 53줄   지오코딩 · outbox relay
 │   ├── policy-service.yml                23줄
 │   ├── search-service.yml                17줄
 │   ├── report-service.yml                23줄
@@ -203,7 +203,7 @@ paw-trail/config
 │   ├── verdict-service.yml               12줄   DB 없음 — 포트만
 │   ├── congestion-service.yml            12줄   DB 없음
 │   ├── route-service.yml                 12줄   DB 없음
-│   ├── ingest-service.yml               161줄   *배치 — 소스 3종 · 허용량 · 표본
+│   ├── ingest-service.yml               227줄   *배치 — 소스 4종 · 허용량 · 표본
 │   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
 └── template-service.yml          2계층   service-template 을 그대로 띄울 때
