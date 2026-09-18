@@ -8,9 +8,11 @@
 #
 # 2계층 파일이 어떤 모양인지 보여 주는 살아 있는 예시이기도 함
 #
-# * DB 는 raw_db 를 빌려 씀
-#   ingest-service 가 소유할 DB 이지만 아직 그 서비스가 없어 겹치지 않음
-#   ingest 가 생긴 뒤에는 둘을 동시에 띄우지 말 것
+# * DB 는 전용 template_db 를 씀
+#   종전에는 raw_db 를 빌려 썼으나 ingest 가 실제로 그 DB 를 채우면서
+#   템플릿을 띄우면 Flyway 가 남의 DB 에 표를 만드는 상태가 되어 분리했음
+#   infra/init-db/01-databases.sh 가 template_db 와 template_svc 를 만듦
+#   ⛔이미 볼륨이 있으면 자동으로 안 생김 — infra README 4-2 의 네 줄을 실행할 것
 #
 # * 포트 8095 는 아무도 쓰지 않는 자리임
 #   도메인은 8081~8094, 플랫폼은 8080·8761·8888 이므로 충돌하지 않음
@@ -21,5 +23,5 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://${app.datasource.host}:5432/raw_db
-    username: ingest_svc
+    url: jdbc:postgresql://${app.datasource.host}:5432/template_db
+    username: template_svc

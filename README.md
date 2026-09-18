@@ -206,7 +206,7 @@ paw-trail/config
 │   ├── ingest-service.yml               227줄   *배치 — 소스 4종 · 허용량 · 표본
 │   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
-└── template-service.yml          2계층   service-template 을 그대로 띄울 때
+└── template-service.yml          2계층   service-template 을 그대로 띄울 때 · 전용 template_db
 ```
 
 > **`config-server.yml` 이 없습니다.** 설정 서버는 **자기 설정을 이 저장소에서
@@ -222,7 +222,7 @@ paw-trail/config
 ```
 293줄  gateway-server    라우트 19개 · 공개키 PEM · 인증 예외 9줄
 238줄  auth-service      JWT · SMTP · OAuth · 쿠키 · permit-all 9줄
- 23줄  place-service     포트 · DB · outbox 스위치
+ 23줄  policy-service    포트 · DB · outbox 스위치
  12줄  verdict-service   포트만
 ```
 
@@ -382,7 +382,7 @@ eureka:
 
 | 블록 | 무엇 |
 |---|---|
-| `spring.datasource.password` | `${SERVICE_DB_PASSWORD}` — 계정 10개가 공유 |
+| `spring.datasource.password` | `${SERVICE_DB_PASSWORD}` — 서비스 계정이 모두 공유 |
 | `spring.cloud.refresh` | **DataSource 를 refresh 대상에 넣음** — [6장](#6-값이-언제-반영되나) |
 | `spring.jpa` | `ddl-auto: validate` · `open-in-view: false` |
 | `spring.flyway` | `locations` 두 곳 · `out-of-order: true` |
@@ -673,6 +673,9 @@ DB 를 옮길 때 고치는 자리가 **3계층의 그 한 줄뿐**입니다.
 | 구글 클라이언트 **시크릿** | | ✓ `AUTH_OAUTH_GOOGLE_CLIENT_SECRET` |
 | 구글 클라이언트 **ID** | ✓ 값 그대로 | |
 | DB 호스트 | | ✓ `DB_HOST` (사람마다 다름) |
+| 공공데이터 서비스 키 | | ✓ `INGEST_PUBLIC_DATA_SERVICE_KEY` |
+| 카카오 REST API 키 | | ✓ `KAKAO_REST_API_KEY` |
+| OpenAI API 키 | | ✓ `OPENAI_API_KEY` |
 | 포트 · 만료 시간 · 경로 | ✓ | |
 
 ---
@@ -770,7 +773,7 @@ app:
 # 장소 담당임
 #
 # 호스트는 3계층의 app.datasource.host 에서 오고 비밀번호는 1계층에 있음
-# 계정 10개가 같은 비밀번호를 쓰므로 여기에는 계정명만 둠
+# 서비스 계정이 모두 같은 비밀번호를 쓰므로 여기에는 계정명만 둠
 # =============================================================================
 
 server:
@@ -801,8 +804,8 @@ server:
 | 값 | 규칙 |
 |---|---|
 | `server.port` | 아래 배정표 |
-| `username` | **`<서비스>_svc`** — `_user` 가 아닙니다 |
-| `url` 의 DB 이름 | `<서비스>_db` (`ingest` 만 `raw_db`) |
+| `username` | **`<서비스>_svc`** — `_user` 가 아닙니다. DB 이름이 예외인 곳은 계정도 같습니다 (`ingest_svc` · `notif_svc`) |
+| `url` 의 DB 이름 | `<서비스>_db`. **예외 둘** — `ingest` 는 `raw_db`, `notification` 은 `notif_db` |
 | `outbox.relay.enabled` | 이벤트를 **발행하는** 서비스만 `true` — auth · place · policy · pet · report |
 | `auditor.system-name` | **배치만** — `ingest-batch` · `extract-batch` |
 
@@ -1279,7 +1282,7 @@ logging:
 | **EC2 를 세울 때** | `prod` 주소 전부 · `application-dev.yml` 의 DB 주석 재검토 |
 | **nginx 를 붙일 때** | `cookie.secure: true` · OAuth 배포 주소 |
 | **AWS 배포 때** | **RS256 키 페어를 새로 만들고 `gateway-server-prod.yml` 에 공개키** |
-| pet 착수 시 | 각 서비스 파일에 `outbox.relay.enabled` 확인 |
+| ~~pet 착수 시~~ ✅끝남 | 발행하는 다섯(auth · pet · place · policy · report)에 `true` 가 들어가 있습니다 |
 | **extract 착수 시** | `extract-service.yml` 이 포트와 감사 이름뿐 — LLM·청크 값이 들어갈 자리 |
 
 > ⚠ **키 페어를 바꿀 때 짝이 어긋나면 전 요청이 401 입니다.**
