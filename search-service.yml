@@ -18,3 +18,16 @@ spring:
   datasource:
     url: jdbc:postgresql://${app.datasource.host}:5432/search_db
     username: search_svc
+
+app:
+  search:
+    reindex:
+      # 매일 전량 재색인 시각 (Asia/Seoul)
+      # 사람이 거의 없는 새벽이고 한 바퀴가 오래 걸리지 않음
+      # 두 대가 같은 시각에 부르지만 Redis 잠금으로 한 대만 돎
+      cron: "0 0 4 * * *"
+
+      # 재색인 잠금의 만료
+      # 실행 중에 프로세스가 죽어도 이 시간이 지나면 저절로 풀림
+      # 한 바퀴보다 넉넉해야 함, 짧으면 도는 중에 풀려 다른 대가 겹쳐 들어옴
+      lock-ttl: 30m
