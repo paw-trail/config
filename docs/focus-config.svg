@@ -3,14 +3,14 @@
 <rect x="572.0" y="317.0" width="356" height="126" rx="18" fill="none" stroke="#D97706" stroke-width="3" opacity="0.5"/>
 <rect x="580.0" y="325.0" width="340" height="110" rx="12" fill="#FEF3C7" stroke="#D97706" stroke-width="3.5"/>
 <text x="750" y="358" font-size="22" font-weight="bold" text-anchor="middle" fill="#111827">paw-trail/config</text>
-<text x="750" y="378" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">yml 23개 · 4계층</text>
+<text x="750" y="378" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">yml 22개 · 4계층</text>
 <text x="750" y="394" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">코드 없음 · 공개 저장소</text>
 <text x="572.0" y="311.0" font-size="13" font-weight="bold" text-anchor="start" fill="#D97706">이 레포</text>
 <rect x="40.0" y="335.0" width="280" height="90" rx="12" fill="#E0E7FF" stroke="#6366F1" stroke-width="2.2"/>
 <text x="180" y="366" font-size="17" font-weight="bold" text-anchor="middle" fill="#111827">config-server</text>
 <text x="180" y="386" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">요청마다 여기를 읽음</text>
 <rect x="40.0" y="90.0" width="280" height="100" rx="12" fill="#DCFCE7" stroke="#22C55E" stroke-width="2.2"/>
-<text x="180" y="118" font-size="17" font-weight="bold" text-anchor="middle" fill="#111827">서비스 17개</text>
+<text x="180" y="118" font-size="17" font-weight="bold" text-anchor="middle" fill="#111827">서비스 16개</text>
 <text x="180" y="138" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">각자 application.yml 은 3줄</text>
 <text x="180" y="154" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">나머지는 여기서</text>
 <rect x="580.0" y="80.0" width="340" height="80" rx="12" fill="#F3F4F6" stroke="#9CA3AF" stroke-width="2.2" stroke-dasharray="9,7"/>
@@ -18,8 +18,8 @@
 <text x="750" y="126" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">${DB_HOST} · ${SERVICE_DB_PASSWORD} · ${AUTH_…}</text>
 <rect x="1150.0" y="155.0" width="300" height="90" rx="12" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2.2"/>
 <text x="1300" y="178" font-size="17" font-weight="bold" text-anchor="middle" fill="#111827">gateway-server.yml</text>
-<text x="1300" y="198" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">라우트 19 · 공개키 · permit-all 9</text>
-<text x="1300" y="214" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">293줄</text>
+<text x="1300" y="198" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">라우트 18 · 공개키 · permit-all 9</text>
+<text x="1300" y="214" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">290줄</text>
 <rect x="1150.0" y="335.0" width="300" height="90" rx="12" fill="#DCFCE7" stroke="#22C55E" stroke-width="2.2"/>
 <text x="1300" y="358" font-size="17" font-weight="bold" text-anchor="middle" fill="#111827">auth-service.yml</text>
 <text x="1300" y="378" font-size="12" font-weight="normal" text-anchor="middle" fill="#4B5563">JWT · 메일 · OAuth · permit-all 9</text>

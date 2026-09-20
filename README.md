@@ -1,6 +1,6 @@
 # config
 
-**함께하개의 설정 저장소입니다.** 서비스 17개의 설정값이 전부 여기 있습니다.
+**함께하개의 설정 저장소입니다.** 서비스 16개의 설정값이 전부 여기 있습니다.
 
 ---
 
@@ -50,7 +50,7 @@
 | | 여기에 두면 | 각 서비스에 두면 |
 |---|---|---|
 | 값을 바꾸면 | **push 하면 끝** | 빌드 → 이미지 → 배포 |
-| DB 주소를 옮기면 | 한 줄 고침 | **14개 서비스를 다시 배포** |
+| DB 주소를 옮기면 | 한 줄 고침 | **DB 를 쓰는 서비스 10개를 다시 배포** |
 | 환경별 차이 | 파일로 갈림 | 코드에 분기 |
 | 값이 어디 있는지 | 여기 하나 | 저장소 17곳 |
 
@@ -60,9 +60,9 @@
 
 | | 값 | 어디에 |
 |---|---|---|
-| yml 파일 | **23개** | [1장](#1-파일-지도) |
+| yml 파일 | **22개** | [1장](#1-파일-지도) |
 | 계층 | 4개 | [2장](#2-4계층--숫자가-큰-쪽이-이김) |
-| 서비스 파일 | 17개 | 도메인 14 + 플랫폼 2 + 템플릿 1 |
+| 서비스 파일 | 16개 | 도메인 13 + 플랫폼 2 + 템플릿 1 |
 | 환경 | 3개 | `local` · `dev` · `prod` |
 | 4계층 실사례 | 2개 | `eureka-server-{local,dev}.yml` |
 | **저장소 공개 여부** | **공개** | [4장](#4-비밀값은-여기-두지-않습니다) |
@@ -185,7 +185,7 @@ paw-trail/config
 ├── application-prod.yml          3계층   AWS EC2                       81줄 (거의 TODO)
 │
 ├── 플랫폼 (2개)
-│   ├── gateway-server.yml        2계층   *라우트 19 · 공개키 · 인증예외  293줄
+│   ├── gateway-server.yml        2계층   *라우트 18 · 공개키 · 인증예외  290줄
 │   ├── eureka-server.yml         2계층                                  44줄
 │   ├── eureka-server-local.yml   4계층   *실사례                        25줄
 │   └── eureka-server-dev.yml     4계층   *실사례                        15줄
@@ -201,7 +201,7 @@ paw-trail/config
 │   ├── review-service.yml                17줄
 │   ├── notification-service.yml          17줄
 │   ├── verdict-service.yml               12줄   DB 없음 — 포트만
-│   ├── weather-service.yml               12줄   DB 없음 · 기상청 단기예보
+│   ├── weather-service.yml               46줄   DB 없음 · 기상청 단기예보
 │   ├── ingest-service.yml               227줄   *배치 — 소스 4종 · 허용량 · 표본
 │   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
@@ -219,7 +219,7 @@ paw-trail/config
 ### 1-1. 파일 크기가 갈리는 이유
 
 ```
-293줄  gateway-server    라우트 19개 · 공개키 PEM · 인증 예외 9줄
+290줄  gateway-server    라우트 18개 · 공개키 PEM · 인증 예외 9줄
 238줄  auth-service      JWT · SMTP · OAuth · 쿠키 · permit-all 9줄
  23줄  policy-service    포트 · DB · outbox 스위치
  12줄  verdict-service   포트만
@@ -969,7 +969,7 @@ spring:
 **지우지 않습니다.**
 
 > `app.datasource.host` 한 줄을 3계층에서 고치고 refresh 하면
-> **14개 서비스가 새 DB 를 봅니다.**
+> **DB 를 쓰는 서비스 10개가 새 DB 를 봅니다.**
 
 <br><br>
 
@@ -1127,9 +1127,9 @@ config 저장소 값이 하나도 안 내려옴
 
 ```
 DB 승격        3계층의 app.datasource.host 한 줄 + refresh
-                재배포 없이 14개 서비스가 새 DB 를 봄
+                재배포 없이 DB 를 쓰는 서비스 10개가 새 DB 를 봄
 
-라우트 개방     앞으로 14번 일어남
+라우트 개방     앞으로 13번 일어남
                 게이트웨이 코드에 있으면 그때마다 blue-green 배포
 ```
 
