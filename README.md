@@ -190,7 +190,7 @@ paw-trail/config
 │   ├── eureka-server-local.yml   4계층   *실사례                        25줄
 │   └── eureka-server-dev.yml     4계층   *실사례                        15줄
 │
-├── 도메인 서비스 (14개)
+├── 도메인 서비스 (13개)
 │   ├── auth-service.yml          2계층   *제일 큼 — JWT · 메일 · OAuth  238줄
 │   ├── user-service.yml                 134줄   S3 · 이미지 상한 · LLM
 │   ├── pet-service.yml                   52줄   S3 · 이미지 상한 · outbox relay
@@ -201,8 +201,7 @@ paw-trail/config
 │   ├── review-service.yml                17줄
 │   ├── notification-service.yml          17줄
 │   ├── verdict-service.yml               12줄   DB 없음 — 포트만
-│   ├── congestion-service.yml            12줄   DB 없음
-│   ├── route-service.yml                 12줄   DB 없음
+│   ├── weather-service.yml               12줄   DB 없음 · 기상청 단기예보
 │   ├── ingest-service.yml               227줄   *배치 — 소스 4종 · 허용량 · 표본
 │   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
@@ -818,8 +817,8 @@ server:
 플랫폼                      도메인
   8080  gateway-server        8081  auth        8088  ingest
   8761  eureka-server         8082  user        8089  extract
-  8888  config-server         8083  pet         8090  congestion
-                              8084  place       8091  route
+  8888  config-server         8083  pet         8090  weather
+                              8084  place       8091  (비움)
                               8085  policy      8092  report
                               8086  verdict     8093  notification
                               8087  search      8094  review

@@ -1,0 +1,46 @@
+# =============================================================================
+# 2계층 — weather-service
+# =============================================================================
+# 지역 날씨 담당임 (기상청 단기예보, 무상태 + Redis 캐시)
+#
+# DB 를 쓰지 않으므로 datasource 를 두지 않음
+# 1계층의 JPA·Flyway 값이 내려오지만 JDBC 의존성 자체를 걷어낸 서비스라
+# 아무 일도 일어나지 않음
+# =============================================================================
+
+server:
+  port: 8090
+
+spring:
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        # 스프링 클라우드 회로 차단기의 시간 제한기를 끔
+        # 켜 두면 기본 1초에 끊기고 호출이 다른 스레드로 넘어감
+        # 제한 시간은 공통 모듈의 바깥 API 용 RestClient 가 맡음 (연결 2초 · 읽기 5초)
+        disable-time-limiter: true
+
+app:
+  weather:
+    kma:
+      # 기상청 단기예보 조회서비스 (data.go.kr 15084084) · 오퍼레이션 이름은 코드가 붙임
+      base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
+      # 공공데이터포털 인증키 — 원본(Decoding) 키 · 계정당 하나라 ingest 와 같은 값
+      # WEATHER_PUBLIC_DATA_SERVICE_KEY 환경변수에서 옴 · 없으면 기동이 실패함
+      service-key: ${WEATHER_PUBLIC_DATA_SERVICE_KEY}
+      # 발표 한 번이 격자 하나에 천 행 안팎 · 오늘 · 내일이 담기면 되므로 한 쪽만 받음
+      num-of-rows: 1000
+      # 요청을 받은 자리에서 부르므로 오래 버티지 않음 · 두 번 해 보고 안 되면 직전 발표로 넘김
+      max-attempts: 2
+      retry-backoff-ms: 300
+    cache:
+      # 가장 새 발표로 3시간 · 그다음 직전 발표로 3시간 쓰임
+      ttl-hours: 7
+    circuit-breaker:
+      # 최근 10번 가운데 절반 넘게 실패하면 열고 30초 동안 기상청을 안 부름 · 그 뒤 두 번 흘려보내 봄
+      # 최소 5번은 본 뒤에 판단함 (기본값은 100번이라 우리 호출 수로는 거의 안 열림)
+      sliding-window-size: 10
+      minimum-number-of-calls: 5
+      failure-rate-threshold: 50
+      wait-seconds-in-open-state: 30
+      permitted-calls-in-half-open-state: 2

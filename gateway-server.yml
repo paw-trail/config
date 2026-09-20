@@ -221,11 +221,6 @@ spring:
               predicates:
                 - Path=/api/v1/places/{placeId}/conflicts
 
-            - id: congestion-service
-              uri: lb://congestion-service
-              predicates:
-                - Path=/api/v1/places/{placeId}/congestion
-
             # ── 검색 ─────────────────────────────────────────
             # /api/v1/search/** 가 /api/v1/search 자체도 맞추므로
             # 검색 · 건수 · 자동완성 · 지도가 한 줄로 덮임
@@ -234,7 +229,7 @@ spring:
               predicates:
                 - Path=/api/v1/search/**
 
-            # ── 제보 · 알림 · 경로 ───────────────────────────
+            # ── 제보 · 알림 · 날씨 ───────────────────────────
             - id: report-service
               uri: lb://report-service
               predicates:
@@ -245,10 +240,12 @@ spring:
               predicates:
                 - Path=/api/v1/notifications/**
 
-            - id: route-service
-              uri: lb://route-service
+            # 좌표로도 지역으로도 부르는 한 경로임 — 장소 밑이 아니라 따로 둠
+            # /api/v1/weather/** 가 /api/v1/weather 자체도 맞춤
+            - id: weather-service
+              uri: lb://weather-service
               predicates:
-                - Path=/api/v1/routes
+                - Path=/api/v1/weather/**
 
             # ── 관리자 ───────────────────────────────────────
             # 두 번째 마디가 어느 서비스인지를 정함

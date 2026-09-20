@@ -35,7 +35,7 @@ spring:
   # ${SERVICE_DB_PASSWORD:1234} 로 쓰면 환경변수를 빠뜨려도 접속이 되어 버려
   # 누락이 영영 드러나지 않음
   #
-  # DB 를 쓰지 않는 서비스(verdict, congestion, route, extract)에도 이 값이 내려가나
+  # DB 를 쓰지 않는 서비스(verdict, weather, extract)에도 이 값이 내려가나
   # 그 서비스들은 JDBC 의존성 자체를 걷어내므로 아무 일도 일어나지 않음
   datasource:
     password: ${SERVICE_DB_PASSWORD}
