@@ -288,3 +288,10 @@ spring:
               uri: lb://search-service
               predicates:
                 - Path=/api/v1/admin/search/**
+
+            # 관리자 화면의 「공사 데이터 최신 수집」 — 실행과 기록 둘뿐임
+            # ingest 가 바깥에 여는 경로는 이것 하나임 (그 밖은 /internal 이라 라우팅하지 않음)
+            - id: admin-ingest
+              uri: lb://ingest-service
+              predicates:
+                - Path=/api/v1/admin/ingest/**

@@ -185,7 +185,7 @@ paw-trail/config
 ├── application-prod.yml          3계층   AWS EC2                       81줄 (거의 TODO)
 │
 ├── 플랫폼 (2개)
-│   ├── gateway-server.yml        2계층   *라우트 18 · 공개키 · 인증예외  290줄
+│   ├── gateway-server.yml        2계층   *라우트 19 · 공개키 · 인증예외  297줄
 │   ├── eureka-server.yml         2계층                                  44줄
 │   ├── eureka-server-local.yml   4계층   *실사례                        25줄
 │   └── eureka-server-dev.yml     4계층   *실사례                        15줄
@@ -202,7 +202,7 @@ paw-trail/config
 │   ├── notification-service.yml          17줄
 │   ├── verdict-service.yml               12줄   DB 없음 — 포트만
 │   ├── weather-service.yml               46줄   DB 없음 · 기상청 단기예보
-│   ├── ingest-service.yml               227줄   *배치 — 소스 4종 · 허용량 · 표본
+│   ├── ingest-service.yml               254줄   *배치 — 소스 4종 · 허용량 · 표본 · 예약
 │   └── extract-service.yml               36줄   배치 — 아직 포트와 auditor 뿐
 │
 └── template-service.yml          2계층   service-template 을 그대로 띄울 때 · 전용 template_db
@@ -219,7 +219,7 @@ paw-trail/config
 ### 1-1. 파일 크기가 갈리는 이유
 
 ```
-290줄  gateway-server    라우트 18개 · 공개키 PEM · 인증 예외 9줄
+297줄  gateway-server    라우트 19개 · 공개키 PEM · 인증 예외 9줄
 238줄  auth-service      JWT · SMTP · OAuth · 쿠키 · permit-all 9줄
  23줄  policy-service    포트 · DB · outbox 스위치
  12줄  verdict-service   포트만
