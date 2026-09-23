@@ -279,6 +279,12 @@ spring:
               predicates:
                 - Path=/api/v1/admin/reports/**
 
+            # 신고를 승인하기 전에 그 후기를 지우는 자리임
+            - id: admin-reviews
+              uri: lb://review-service
+              predicates:
+                - Path=/api/v1/admin/reviews/**
+
             - id: admin-verdicts
               uri: lb://verdict-service
               predicates:
