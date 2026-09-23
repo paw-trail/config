@@ -1,0 +1,28 @@
+# =============================================================================
+# 4계층 — gateway-server · prod
+# =============================================================================
+# 배포 서버에서 토큰 서명을 확인하는 공개키임
+#
+# * 로컬 개발 키와 다른 운영 전용 키 쌍임
+#   짝이 되는 개인키는 배포 서버 .env 의 AUTH_JWT_PRIVATE_KEY_B64 에만 있음
+#   gateway-server.yml 의 로컬 공개키는 그대로 두고 prod 에서만 이 값으로 덮음
+#
+# * openssl 이 뱉은 그대로 넣음
+#   머리와 꼬리 줄을 떼거나 한 줄로 잇지 않음
+#
+# * 개인키와 짝이 아니면 배포 서버의 전 요청이 401 이 됨
+#   키를 바꿀 때는 이 파일과 배포 서버 .env 를 함께 고칠 것
+# =============================================================================
+
+app:
+  jwt:
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArIXmgBKfUSxfJLf5iVsz
+      tWIsv3a4EWSV+qIy+lh5r+kPaLxvJCfiZhmUz5I3zqIpTUqBvV78Qorfr12gkzqQ
+      HYkWkRhWFbpyaMJ5LCpMUE6Qti2d17Z57MG6I3exmXfz3lbYU2dvHO8husmmtC7E
+      AUsTHm4v/NzlJWo8J019sH9LFif3u/4lYxYrLXy9jYQEBng/o2EpoBUfR/VJIrZt
+      XGVazB/VgY369lLu0XboDF1Zr94T5Qambx3EfnY6eSiTkpEmTJd08Yo3LSEb3IME
+      8Lf8HrfDiXJw8Qcz8lbIyguOS5NVUrcwqkHreAnUv9KcxPczthpDd23w1hHc53BB
+      /wIDAQAB
+      -----END PUBLIC KEY-----

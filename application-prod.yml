@@ -2,80 +2,50 @@
 # 3계층 — prod
 # 2계층(<서비스명>.yml)보다 셈, 서비스가 이 값을 덮으려면 4계층을 써야 함
 # =============================================================================
-# AWS EC2 에 배포할 때 쓰는 주소임
+# 배포 서버에서 dev 위에 겹쳐 켜는 프로파일임
+#   SPRING_PROFILES_ACTIVE=dev,prod — 뒤에 적은 prod 가 dev 의 같은 키를 덮음
+#   컨테이너끼리 찾는 주소(kafka · redis · eureka · zipkin · loki · DB)는 dev 값을 그대로 씀
+#   배포 서버도 로컬과 같은 compose 네트워크로 돌기 때문임
 #
-# * 노드 구성과 사설 IP 가 정해지지 않아 주소가 아직 비어 있음
-#   아래 TODO 를 채우기 전에는 prod 프로파일로 띄우지 말 것
-#   값이 없으면 1계층 값이 그대로 내려가 local 주소로 붙으려 시도하며
-#   오류 없이 이상하게 동작함
+# 그래서 이 파일에는 배포 서버에서만 달라지는 값만 둠
+#   https 쿠키 · 브라우저가 찾아가는 공개 주소 · API 문서 끄기 · 로그 수준
+#   운영용 서명 공개키는 4계층 gateway-server-prod.yml 에 있음
 #
-# * 주석을 풀 때 최상위 키(app, spring, eureka, management)가 두 번 나오지 않게 할 것
+# * prod 를 혼자 켜지 말 것
+#   컨테이너 주소가 없어 1계층의 local 주소로 붙으려 하며 오류 없이 이상하게 동작함
+#
+# * 최상위 키(app, springdoc, logging)가 두 번 나오지 않게 할 것
 #   YAML 중복 키가 되면 앞의 블록이 통째로 무시됨
-#   아래는 하나의 트리로 이어 두었으므로 블록째 주석만 풀면 됨
 # =============================================================================
+
+app:
+  auth:
+    cookie:
+      # 배포 서버는 https 로만 받으므로 켬
+      # Cloudflare 와 nginx 를 거쳐도 브라우저가 보는 주소는 https 임
+      secure: true
+
+  oauth:
+    # 브라우저가 찾아가는 주소이므로 공개 도메인임
+    #
+    # * 구글은 리디렉션 URI 에 원시 IP 를 허용하지 않고 HTTPS 를 요구함
+    #   localhost 만 예외이므로 배포에서는 도메인과 인증서가 반드시 있어야 함
+    #
+    # * 구글 콘솔의 "승인된 리디렉션 URI" 에도 같은 값을 등록해야 함
+    #   반영되는 데 5분에서 몇 시간이 걸릴 수 있으므로 미리 등록해 둘 것
+    frontend-base-url: https://paw-trail.click
+    google:
+      redirect-uri: https://paw-trail.click/api/v1/auth/oauth/google/callback
+
+springdoc:
+  # 배포 서버에서는 API 문서를 열지 않음
+  # 서비스 포트가 서버 안(127.0.0.1)에만 열리지만 한 번 더 막음
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 logging:
   level:
     # 배포 환경에서는 DEBUG 를 쓰지 않음
     com.pawtrail: INFO
-
-# -----------------------------------------------------------------------------
-# TODO: AWS 노드 구성이 정해지면 아래 주석을 풀고 사설 IP 를 채울 것
-# -----------------------------------------------------------------------------
-# app:
-#   datasource:
-#     # TODO: data-primary 노드의 사설 IP
-#     #       DB 승격 시 Jenkins 가 고치는 자리가 이 한 줄임
-#     host: 10.0.0.0
-#   logging:
-#     loki:
-#       # TODO: 관측 노드의 사설 IP
-#       url: http://10.0.0.0:3100/loki/api/v1/push
-#
-# spring:
-#   data:
-#     redis:
-#       # TODO: Redis 가 뜨는 노드의 사설 IP
-#       host: 10.0.0.0
-#       port: 6379
-#   kafka:
-#     # TODO: Kafka 노드의 사설 IP
-#     bootstrap-servers: 10.0.0.0:9092
-#   datasource:
-#     hikari:
-#       # TODO: EC2 공용 DB 의 max_connections 를 확인한 뒤 필요하면 넣을 것
-#       #       기본값(10)으로 충분하면 이 줄을 두지 않음
-#       maximum-pool-size: 10
-#
-#   oauth:
-#     # 브라우저가 찾아가는 주소이므로 사설 IP 가 아니라 공개 도메인임
-#     #
-#     # * 구글은 리디렉션 URI 에 원시 IP 를 허용하지 않고 HTTPS 를 요구함
-#     #   localhost 만 예외이므로 배포에서는 도메인과 인증서가 반드시 있어야 함
-#     #   즉 nginx 에 TLS 를 붙이기 전에는 소셜 로그인이 배포 환경에서 동작하지 않음
-#     #
-#     # * 콘솔의 "승인된 리디렉션 URI" 에도 같은 값을 등록해야 함
-#     #   반영되는 데 5분에서 몇 시간이 걸릴 수 있으므로 미리 등록해 둘 것
-#     # TODO: 도메인이 정해지면 채울 것
-#     frontend-base-url: https://example.com
-#     google:
-#       # TODO: 도메인이 정해지면 채울 것
-#       redirect-uri: https://example.com/api/v1/auth/oauth/google/callback
-#
-# eureka:
-#   client:
-#     service-url:
-#       # TODO: edge 노드의 사설 IP
-#       defaultZone: http://10.0.0.0:8761/eureka/
-#   instance:
-#     prefer-ip-address: true
-#
-# management:
-#   tracing:
-#     export:
-#       zipkin:
-#         # TODO: 관측 노드의 사설 IP
-#         endpoint: http://10.0.0.0:9411/api/v2/spans
-#     sampling:
-#       # TODO: 부하 테스트 결과를 보고 값을 정할 것 (1계층은 1.0 임)
-#       probability: 1.0
